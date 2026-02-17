@@ -1,5 +1,7 @@
 {
-  "projects": {},
+  "projects": {
+    "default": "sharkfin-1312a"
+  },
   "targets": {},
   "etags": {}
 }
