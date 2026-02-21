@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "855823693206",
+    "project_id": "sharkfin-eba6f",
+    "storage_bucket": "sharkfin-eba6f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:855823693206:android:5d8a5df4f92249b050d9b7",
+        "android_client_info": {
+          "package_name": "com.example.sharkfin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPeEbQEPyln6zSP3irUtOPM3XjjpmuIY0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
