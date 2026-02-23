@@ -3,14 +3,14 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getFunctions } from "firebase/functions";
 
-// TODO: Replace with your app's Firebase project configuration
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyDfqW3OtI4gVtJGYmQcP9SZp1QjqrGv0cg",
+  authDomain: "sharkfin-eba6f.firebaseapp.com",
+  projectId: "sharkfin-eba6f",
+  storageBucket: "sharkfin-eba6f.firebasestorage.app",
+  messagingSenderId: "855823693206",
+  appId: "1:855823693206:web:fdfa23d2cba4529c50d9b7",
+  measurementId: "G-QTVKYWDHCL",
 };
 
 // Initialize Firebase
