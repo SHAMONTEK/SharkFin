@@ -1,0 +1,18 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.Sharkfin" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Customize your light theme here. -->
+        <item name="colorPrimary">@color/neon_green</item>
+        <item name="colorOnPrimary">@color/navy</item>
+        <item name="colorSecondary">@color/neon_green</item>
+        <item name="colorOnSecondary">@color/navy</item>
+        <item name="android:statusBarColor">@color/neon_green</item>
+    </style>
+
+    <style name="Theme.Sharkfin" parent="Base.Theme.Sharkfin" />
+
+    <style name="Theme.Sharkfin.NoActionBar" parent="Theme.Sharkfin">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+</resources>
