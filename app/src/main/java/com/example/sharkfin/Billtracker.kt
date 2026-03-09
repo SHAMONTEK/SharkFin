@@ -24,37 +24,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ServerTimestamp
 import java.text.SimpleDateFormat
 import java.util.*
 
 // ─── Bill Data Class ───────────────────────────────────────────────────────
-data class Bill(
-    val id: String = "",
-    val name: String = "",
-    val amount: Double = 0.0,
-    val dayOfMonth: Int = 1,
-    val recurrence: String = "Monthly",
-    val category: String = "Housing",
-    val isPaid: Boolean = false,
-    val color: String = "#f59e0b",
-    @ServerTimestamp
-    val createdAt: Date? = null
-)
-
-data class BillCategory(val name: String, val icon: ImageVector, val color: Color)
-
-val billCategories = listOf(
-    BillCategory("Housing",       Icons.Default.Home,           Color(0xFFf59e0b)),
-    BillCategory("Utilities",     Icons.Default.ElectricBolt,   Color(0xFF06b6d4)),
-    BillCategory("Subscriptions", Icons.Default.Subscriptions,  Color(0xFF8b5cf6)),
-    BillCategory("Transport",     Icons.Default.DirectionsCar,  Color(0xFF10b981)),
-    BillCategory("Insurance",     Icons.Default.Security,       Color(0xFFef4444)),
-    BillCategory("Other",         Icons.Default.Receipt,        Color(0xFF6b7280))
-)
-
-val recurrenceOptions = listOf("Weekly", "Bi-weekly", "Monthly", "One-time")
-
 @Composable
 fun BillTrackerScreen(
     uid: String,

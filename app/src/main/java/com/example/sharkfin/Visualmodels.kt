@@ -38,7 +38,7 @@ fun VisualModelsScreen(
     val totalIncome = expenses.filter { it.category == "Income" }.sumOf { it.amount }
     val totalSpending = expenses.filter { it.category != "Income" }.sumOf { it.amount }
     val totalBills = bills.sumOf { it.amount }
-    
+
     val taxableIncome = (totalIncome - 12000.0).coerceAtLeast(0.0) // simplified deduction
     val estimatedTax = calculateEstimatedTax(taxableIncome)
     val netBalance = totalIncome - totalSpending - estimatedTax
@@ -104,12 +104,12 @@ fun VisualModelsScreen(
 fun HealthScoreCard(expenses: List<Expense>, bills: List<Bill>, goals: List<Goal>) {
     val totalIncome = expenses.filter { it.category == "Income" }.sumOf { it.amount }
     val totalSpend = expenses.filter { it.category != "Income" }.sumOf { it.amount }
-    
+
     // Logic: Savings Rate (40%) + Goal Pace (40%) + Bill Burden (20%)
     val savingsRate = if (totalIncome > 0) ((totalIncome - totalSpend) / totalIncome).coerceIn(0.0, 1.0) else 0.0
     val goalsOnPace = if (goals.isNotEmpty()) {
         val activeGoals = goals.filter { !it.isCompleted }
-        if (activeGoals.isEmpty()) 1.0 
+        if (activeGoals.isEmpty()) 1.0
         else {
             // Check if user has saved at least 10% of total target of active goals
             val totalTarget = activeGoals.sumOf { it.targetAmount }
@@ -118,7 +118,7 @@ fun HealthScoreCard(expenses: List<Expense>, bills: List<Bill>, goals: List<Goal
         }
     } else 1.0
     val billBurden = if (totalIncome > 0) (1.0 - (bills.sumOf { it.amount } / totalIncome)).coerceIn(0.0, 1.0) else 1.0
-    
+
     val score = ((savingsRate * 40) + (goalsOnPace * 40) + (billBurden * 20)).toInt().coerceIn(0, 100)
     val scoreColor = when {
         score > 75 -> SharkGreen
@@ -226,7 +226,7 @@ fun DonutChartWithDrilldown(expenses: List<Expense>, selectedCategory: String?, 
 @Composable
 fun FlowBarChart(income: Double, spending: Double, bills: Double, taxes: Double) {
     val maxVal = maxOf(income, spending + bills + taxes, 1.0)
-    
+
     Box(modifier = Modifier.fillMaxWidth().glassCard(alpha = 0.05f).padding(20.dp)) {
         Row(modifier = Modifier.fillMaxWidth().height(160.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Bottom) {
             Bar("Income", income, maxVal, SharkGreen)
@@ -265,9 +265,9 @@ fun TripleTrendChart(expenses: List<Expense>) {
                 Spacer(modifier = Modifier.width(12.dp))
                 LegendItem("Net", Color.White)
             }
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawTrendLine(incomePoints, SharkGreen)
                 drawTrendLine(spendPoints, Color(0xFFef4444))
@@ -301,7 +301,7 @@ fun LegendItem(text: String, color: Color) {
 @Composable
 fun ForecastSection(currentNet: Double, avgSpend: Double, income: Double) {
     val dailyNet = (income - avgSpend) / 30.0
-    
+
     Box(modifier = Modifier.fillMaxWidth().glassCard(alpha = 0.1f).padding(20.dp)) {
         Column {
             ProjectionRow("30 Days", dailyNet * 30)
@@ -329,12 +329,4 @@ fun ProjectionRow(days: String, amount: Double) {
             fontWeight = FontWeight.Bold
         )
     }
-}
-
-fun getCategoryColor(name: String): Color = when(name) {
-    "Income" -> SharkGreen
-    "Bills & Utilities" -> Color(0xFFf59e0b)
-    "Entertainment" -> Color(0xFF8b5cf6)
-    "People I Owe" -> Color(0xFFef4444)
-    else -> Color(0xFF06b6d4)
 }

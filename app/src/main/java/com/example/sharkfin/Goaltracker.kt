@@ -30,36 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.Canvas
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ServerTimestamp
 import java.text.SimpleDateFormat
 import java.util.*
-
-// ─── Goal Data Class ───────────────────────────────────────────────────────
-data class Goal(
-    val id: String = "",
-    val name: String = "",           // e.g. "Emergency Fund", "New Laptop"
-    val targetAmount: Double = 0.0,  // how much you want to save
-    val savedAmount: Double = 0.0,   // how much you've saved toward it so far
-    val category: String = "Savings",
-    val deadline: String = "",       // stored as "MM/dd/yyyy" string
-    val isCompleted: Boolean = false,
-    val colorHex: String = "#10b981",// accent color for this goal card
-    @ServerTimestamp
-    val createdAt: Date? = null
-)
-
-// ─── Goal Categories ───────────────────────────────────────────────────────
-data class GoalCategory(val name: String, val icon: ImageVector, val color: Color)
-
-val goalCategories = listOf(
-    GoalCategory("Savings",      Icons.Default.Savings,          Color(0xFF10b981)),
-    GoalCategory("Emergency",    Icons.Default.Shield,            Color(0xFFef4444)),
-    GoalCategory("Something New",       Icons.Default.Flight,            Color(0xFF06b6d4)),
-    GoalCategory("Tech",         Icons.Default.Devices,           Color(0xFF8b5cf6)),
-    GoalCategory("Loan",    Icons.Default.School,            Color(0xFFf59e0b)),
-    GoalCategory("Other",        Icons.Default.Star,              Color(0xFF6b7280))
-)
-
 // ─── Goal Tracker Screen ───────────────────────────────────────────────────
 @Composable
 fun GoalTrackerScreen(

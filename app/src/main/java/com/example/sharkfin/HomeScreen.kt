@@ -46,7 +46,6 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 
-val SharkRed   = Color(0xFFFF3B30)
 
 @Composable
 fun HomeScreen(
