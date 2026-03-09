@@ -81,6 +81,16 @@ dependencies {
 
     implementation(libs.androidx.work.runtime)
 
+    implementation(libs.itext.kernel)
+    implementation(libs.itext.io)
+    implementation(libs.itext.layout)
+    implementation(libs.itext.forms)
+    implementation(libs.itext.pdfa)
+    implementation(libs.itext.sign)
+    implementation(libs.itext.barcodes)
+    implementation(libs.itext.font.asian)
+    implementation(libs.itext.hyph)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

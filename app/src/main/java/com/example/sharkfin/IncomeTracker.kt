@@ -37,7 +37,7 @@ fun IncomeSourcesSection(
         ) {
             Text("Income Sources", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             IconButton(onClick = onAddClick) {
-                Icon(Icons.Default.Add, "Add Source", tint = SharkGreen)
+                Icon(Icons.Default.Add, "Add Source", tint = SharkNavy)
             }
         }
         
@@ -72,10 +72,10 @@ fun IncomeSourceCard(uid: String, db: FirebaseFirestore, source: IncomeSource) {
         Box(
             modifier = Modifier
                 .size(40.dp)
-                .background(SharkGreen.copy(alpha = 0.15f), CircleShape),
+                .background(SharkNavy.copy(alpha = 0.15f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.Payments, null, tint = SharkGreen, modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.Payments, null, tint = SharkNavy, modifier = Modifier.size(20.dp))
         }
         
         Spacer(modifier = Modifier.width(12.dp))
@@ -103,9 +103,9 @@ fun IncomeSourceCard(uid: String, db: FirebaseFirestore, source: IncomeSource) {
             },
             modifier = Modifier
                 .size(36.dp)
-                .background(SharkGreen, CircleShape)
+                .background(SharkNavy, CircleShape)
         ) {
-            Icon(Icons.Default.Check, "Received", tint = Color.Black, modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.Check, "Received", tint = Color.White, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -119,7 +119,7 @@ fun AddIncomeSourceSheet(uid: String, db: FirebaseFirestore, onDismiss: () -> Un
     val frequencies = listOf("Weekly", "Biweekly", "Monthly", "One-time")
     var expanded by remember { mutableStateOf(false) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Color(0xFF0d1f17)) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = SharkBase) {
         Column(modifier = Modifier.fillMaxWidth().padding(24.dp).navigationBarsPadding().imePadding()) {
             Text("New Income Source", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(24.dp))
@@ -167,9 +167,9 @@ fun AddIncomeSourceSheet(uid: String, db: FirebaseFirestore, onDismiss: () -> Un
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(54.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SharkGreen)
+                colors = ButtonDefaults.buttonColors(containerColor = SharkNavy)
             ) {
-                Text("Add Income Source", color = Color.Black, fontWeight = FontWeight.Bold)
+                Text("Add Income Source", color = Color.White, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.height(20.dp))
         }

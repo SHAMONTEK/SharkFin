@@ -206,7 +206,7 @@ fun SharkFinDashboard(
             .fillMaxSize()
             .background(
                 Brush.radialGradient(
-                    colors = listOf(Color(0xFF0a1a14), SharkBlack),
+                    colors = listOf(SharkDeepOcean, SharkBlack),
                     radius = 1200f
                 )
             )
@@ -270,8 +270,8 @@ fun SharkFinDashboard(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = 24.dp, bottom = 110.dp),
-                containerColor = SharkGreen,
-                contentColor = Color.Black,
+                containerColor = SharkNavy,
+                contentColor = Color.White,
                 shape = CircleShape
             ) {
                 Icon(Icons.Default.Add, "Add Transaction", modifier = Modifier.size(28.dp))
@@ -283,13 +283,14 @@ fun SharkFinDashboard(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
-                        Brush.radialGradient(colors = listOf(Color(0xFF0a1a14), SharkBlack), radius = 1200f)
+                        Brush.radialGradient(colors = listOf(SharkDeepOcean, SharkBlack), radius = 1200f)
                     )
             ) {
                 when (openFeature) {
                     "Bill Tracker"     -> BillTrackerScreen(uid, db, expenses, bills)
                     "Goal Tracker"     -> GoalTrackerScreen(uid, db, expenses, goals)
                     "Visual Models"    -> VisualModelsScreen(expenses, bills, goals)
+                    "Import Statement" -> ImportStatementScreen(uid, db) { openFeature = null }
                     "Tax Tracker"      -> TaxTrackerScreen(expenses)
                     "Inflation Calc"   -> InflationCalcScreen()
                     "Stock/Forex"      -> StockForexScreen()
@@ -298,15 +299,17 @@ fun SharkFinDashboard(
                     else               -> ComingSoonPlaceholder(openFeature!!)
                 }
 
-                Box(
-                    modifier = Modifier
-                        .padding(top = 56.dp, start = 20.dp)
-                        .size(44.dp)
-                        .glassCard(22f, 0.15f)
-                        .clickable { openFeature = null },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.ArrowBack, "Back", tint = Color.White)
+                if (openFeature != "Import Statement") {
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 56.dp, start = 20.dp)
+                            .size(44.dp)
+                            .glassCard(22f, 0.15f)
+                            .clickable { openFeature = null },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.ArrowBack, "Back", tint = Color.White)
+                    }
                 }
             }
         }
@@ -358,17 +361,17 @@ fun GlassBottomNav(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     if (selected) {
-                        Box(Modifier.width(18.dp).height(3.dp).background(SharkGreen, RoundedCornerShape(2.dp)))
+                        Box(Modifier.width(18.dp).height(3.dp).background(SharkNavy, RoundedCornerShape(2.dp)))
                         Spacer(Modifier.height(4.dp))
                     } else {
                         Spacer(Modifier.height(7.dp))
                     }
-                    Icon(imageVector = tab.icon, contentDescription = null, tint = if (selected) SharkGreen else SharkMuted, modifier = Modifier.size(22.dp))
+                    Icon(imageVector = tab.icon, contentDescription = null, tint = if (selected) SharkNavy else SharkMuted, modifier = Modifier.size(22.dp))
                     Spacer(Modifier.height(2.dp))
                     Text(
                         tab.label,
                         fontSize = 10.sp,
-                        color = if (selected) SharkGreen else SharkMuted,
+                        color = if (selected) SharkNavy else SharkMuted,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
                 }
             }

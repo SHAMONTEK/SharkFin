@@ -38,7 +38,7 @@ fun GoalTrackerScreen(
     uid: String,
     db: FirebaseFirestore,
     expenses: List<Expense>,
-    goals: List<Goal> // Now passed from Dashboard
+    goals: List<Goal>
 ) {
     var showAddGoal   by remember { mutableStateOf(false) }
     var selectedGoal  by remember { mutableStateOf<Goal?>(null) }
@@ -73,11 +73,11 @@ fun GoalTrackerScreen(
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .background(SharkGreen, CircleShape)
+                    .background(SharkNavy, CircleShape)
                     .clickable { showAddGoal = true },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Add, "Add Goal", tint = Color.Black, modifier = Modifier.size(22.dp))
+                Icon(Icons.Default.Add, "Add Goal", tint = Color.White, modifier = Modifier.size(22.dp))
             }
         }
 
@@ -90,7 +90,7 @@ fun GoalTrackerScreen(
                 .clip(RoundedCornerShape(24.dp))
                 .background(
                     Brush.linearGradient(
-                        colors = listOf(Color(0xFF0d3d2b), Color(0xFF0a2a1e))
+                        colors = listOf(SharkSurfaceHigh, SharkSurface)
                     )
                 )
                 .padding(24.dp)
@@ -114,7 +114,7 @@ fun GoalTrackerScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 val overallFraction = if (totalTargeted > 0) (totalSaved / totalTargeted).toFloat().coerceIn(0f, 1f) else 0f
-                GoalProgressBar(fraction = overallFraction, color = SharkGreen, height = 8)
+                GoalProgressBar(fraction = overallFraction, color = SharkNavy, height = 8)
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -133,16 +133,16 @@ fun GoalTrackerScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(SharkGreen.copy(alpha = 0.08f))
-                    .border(1.dp, SharkGreen.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+                    .background(SharkNavy.copy(alpha = 0.08f))
+                    .border(1.dp, SharkNavy.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.TrendingUp, null, tint = SharkGreen, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.TrendingUp, null, tint = SharkNavy, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         "You have \$${String.format("%.0f", monthlySurplus)}/mo available to save",
-                        color = SharkGreen,
+                        color = SharkNavy,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -282,7 +282,7 @@ fun GoalCard(
                 Icon(
                     if (goal.isCompleted) Icons.Default.CheckCircle else category.icon,
                     null,
-                    tint = if (goal.isCompleted) SharkGreen else category.color,
+                    tint = if (goal.isCompleted) SharkNavy else category.color,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -308,14 +308,14 @@ fun GoalCard(
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
                         .background(
-                            if (onPace) SharkGreen.copy(alpha = 0.15f)
-                            else Color(0xFFf59e0b).copy(alpha = 0.15f)
+                            if (onPace) SharkNavy.copy(alpha = 0.15f)
+                            else SharkAmber.copy(alpha = 0.15f)
                         )
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
                         if (onPace) "On pace ✓" else "Behind ⚠",
-                        color = if (onPace) SharkGreen else Color(0xFFf59e0b),
+                        color = if (onPace) SharkNavy else SharkAmber,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -415,7 +415,7 @@ fun GoalDetailSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor   = Color(0xFF0d1f17),
+        containerColor   = SharkBase,
         shape            = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
         dragHandle = {
             Box(modifier = Modifier.padding(top = 12.dp, bottom = 4.dp).width(40.dp).height(4.dp).background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(2.dp)))
@@ -487,11 +487,11 @@ fun GoalDetailSheet(
                     },
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape    = RoundedCornerShape(16.dp),
-                    colors   = ButtonDefaults.buttonColors(containerColor = SharkGreen),
+                    colors   = ButtonDefaults.buttonColors(containerColor = SharkNavy),
                     enabled  = !isSaving
                 ) {
-                    if (isSaving) CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    else Text("Add Savings", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    if (isSaving) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    else Text("Add Savings", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -505,8 +505,8 @@ fun GoalDetailSheet(
                     },
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     shape    = RoundedCornerShape(16.dp),
-                    colors   = ButtonDefaults.outlinedButtonColors(contentColor = SharkGreen),
-                    border   = androidx.compose.foundation.BorderStroke(1.dp, SharkGreen.copy(alpha = 0.4f))
+                    colors   = ButtonDefaults.outlinedButtonColors(contentColor = SharkNavy),
+                    border   = androidx.compose.foundation.BorderStroke(1.dp, SharkNavy.copy(alpha = 0.4f))
                 ) {
                     Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(8.dp))
@@ -517,14 +517,14 @@ fun GoalDetailSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(SharkGreen.copy(alpha = 0.1f))
+                        .background(SharkNavy.copy(alpha = 0.1f))
                         .padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.CheckCircle, null, tint = SharkGreen, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.CheckCircle, null, tint = SharkNavy, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text("Goal completed! 🎉", color = SharkGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Goal completed! 🎉", color = SharkNavy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                 }
 
@@ -557,9 +557,9 @@ fun GoalDetailSheet(
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Default.Delete, null, tint = Color(0xFFef4444), modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Delete, null, tint = SharkRed, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Delete Goal", color = Color(0xFFef4444), fontSize = 13.sp)
+                Text("Delete Goal", color = SharkRed, fontSize = 13.sp)
             }
         }
     }
@@ -646,7 +646,7 @@ fun AddGoalSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor   = Color(0xFF0d1f17),
+        containerColor   = SharkBase,
         shape            = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
         dragHandle = {
             Box(modifier = Modifier.padding(top = 12.dp, bottom = 4.dp).width(40.dp).height(4.dp).background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(2.dp)))
@@ -716,7 +716,7 @@ fun AddGoalSheet(
                             savedAmount  = 0.0,
                             category     = selectedCat.name,
                             deadline     = deadline.trim(),
-                            colorHex     = selectedCat.color.value.toString()
+                            colorHex     = String.format("#%06X", (0xFFFFFF and selectedCat.color.value.toInt()))
                         )
 
                         db.collection("users").document(uid)
@@ -728,11 +728,11 @@ fun AddGoalSheet(
                 },
                 modifier = Modifier.fillMaxWidth().height(54.dp),
                 shape    = RoundedCornerShape(18.dp),
-                colors   = ButtonDefaults.buttonColors(containerColor = SharkGreen),
+                colors   = ButtonDefaults.buttonColors(containerColor = SharkNavy),
                 enabled  = !isSaving
             ) {
-                if (isSaving) CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                else Text("Create Goal", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                if (isSaving) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                else Text("Create Goal", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         }
     }

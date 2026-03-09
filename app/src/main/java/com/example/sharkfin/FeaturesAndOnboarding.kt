@@ -58,6 +58,14 @@ fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
             tag         = ""
         ),
         SharkFeature(
+            name        = "Import Statement",
+            icon        = Icons.Default.FileUpload,
+            color       = SharkGreen,
+            available   = true,
+            description = "Bulk add expenses from bank CSV",
+            tag         = "NEW"
+        ),
+        SharkFeature(
             name        = "Bill Tracker",
             icon        = Icons.Default.Receipt,
             color       = Color(0xFFf59e0b),

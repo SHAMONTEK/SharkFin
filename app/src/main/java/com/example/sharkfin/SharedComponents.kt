@@ -26,40 +26,44 @@ import androidx.compose.ui.unit.sp
 import com.google.firebase.firestore.ServerTimestamp
 import java.util.*
 
-// ─── Core Colors ───────────────────────────────────────────────────────────
-val SharkGreen      = Color(0xFF00C853)
+// ─── Core Colors (Shark Ocean Theme) ───────────────────────────────────────
+val SharkNavy       = Color(0xFF0A84FF) // Electric Shark Blue
+val SharkDeepOcean  = Color(0xFF001220) // Deep Navy Base
 val SharkBlack      = Color(0xFF000000)
-val SharkDark       = Color(0xFF0A0A0A)
-val SharkCard       = Color(0xFF111111)
-val SharkCardBorder = Color(0xFF1A1A1A)
-val SharkMuted      = Color(0xFF666666)
-val SharkRed        = Color(0xFFFF3B30)
-val SharkAmber      = Color(0xFFF59E0B)
+val SharkDark       = Color(0xFF050505)
+val SharkCard       = Color(0xFF0D1B2A)
+val SharkCardBorder = Color(0xFF1B263B)
+val SharkMuted      = Color(0xFF778DA9) // Steel Blue Muted
+val SharkRed        = Color(0xFFFF453A)
+val SharkAmber      = Color(0xFFFFD60A)
 
 // ─── Theme Aliases ─────────────────────────────────────────────────────────
-val SharkBase           = SharkBlack
-val SharkSurface        = Color(0xFF111111)
-val SharkSurfaceHigh    = Color(0xFF1C1C1C)
-val SharkOverlay        = Color(0xFF222222)
-val SharkBorderSubtle   = Color(0xFF1A1A1A)
-val SharkBorderMedium   = Color(0xFF2A2A2A)
-val SharkBorderStrong   = Color(0xFF3A3A3A)
-val SharkGold           = SharkGreen
-val SharkGoldGlow       = SharkGreen.copy(alpha = 0.12f)
+val SharkBase           = SharkDeepOcean
+val SharkSurface        = Color(0xFF0D1B2A)
+val SharkSurfaceHigh    = Color(0xFF1B263B)
+val SharkOverlay        = Color(0xFF415A77)
+val SharkBorderSubtle   = Color(0xFF1B263B)
+val SharkBorderMedium   = Color(0xFF415A77)
+val SharkBorderStrong   = Color(0xFF778DA9)
+val SharkGold           = SharkNavy
+val SharkGoldGlow       = SharkNavy.copy(alpha = 0.12f)
 val SharkTextPrimary    = Color.White
-val SharkTextSecondary  = Color(0xFFCCCCCC)
+val SharkTextSecondary  = Color(0xFFE0E1DD)
 val SharkTextMuted      = SharkMuted
-val SharkPositive       = SharkGreen
+val SharkPositive       = SharkNavy
 val SharkNegative       = SharkRed
 val SharkWarning        = SharkAmber
-val SharkInfo           = Color(0xFF06B6D4)
+val SharkInfo           = Color(0xFF64FFDA)
+
+// Redirect SharkGreen to SharkNavy for Ocean theme
+val SharkGreen          = SharkNavy
 
 // ─── Liquid Glass Modifier ─────────────────────────────────────────────────
 fun Modifier.glassCard(cornerRadius: Float = 24f, alpha: Float = 0.08f): Modifier = this
     .clip(RoundedCornerShape(cornerRadius.dp))
     .drawBehind {
         drawRoundRect(
-            color = Color(0xFF00C853).copy(alpha = 0.04f),
+            color = SharkNavy.copy(alpha = 0.04f),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius.dp.toPx())
         )
     }
@@ -93,9 +97,9 @@ data class IncomeSource(
 data class ExpenseCategory(val name: String, val icon: ImageVector, val color: Color)
 
 val expenseCategories = listOf(
-    ExpenseCategory("Income",            Icons.Default.TrendingUp,  SharkGreen),
+    ExpenseCategory("Income",            Icons.Default.TrendingUp,  SharkNavy),
     ExpenseCategory("Bills & Utilities", Icons.Default.Receipt,     SharkAmber),
-    ExpenseCategory("Entertainment",     Icons.Default.MusicNote,   Color(0xFF8B5CF6)),
+    ExpenseCategory("Entertainment",     Icons.Default.MusicNote,   Color(0xFFBF5AF2)),
     ExpenseCategory("People I Owe",      Icons.Default.People,      SharkRed)
 )
 
@@ -143,7 +147,7 @@ fun FeatureTutorialOverlay(title: String, description: String, onDismiss: () -> 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.85f))
+            .background(SharkBlack.copy(alpha = 0.85f))
             .clickable { onDismiss() }
             .padding(40.dp),
         contentAlignment = Alignment.Center
@@ -154,7 +158,7 @@ fun FeatureTutorialOverlay(title: String, description: String, onDismiss: () -> 
                 .glassCard(cornerRadius = 24f, alpha = 0.15f)
                 .padding(28.dp)
         ) {
-            Icon(Icons.Default.Lightbulb, null, tint = SharkGreen, modifier = Modifier.size(48.dp))
+            Icon(Icons.Default.Lightbulb, null, tint = SharkNavy, modifier = Modifier.size(48.dp))
             Spacer(Modifier.height(16.dp))
             Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
@@ -166,7 +170,7 @@ fun FeatureTutorialOverlay(title: String, description: String, onDismiss: () -> 
                 lineHeight = 20.sp
             )
             Spacer(Modifier.height(24.dp))
-            Text("Tap anywhere to continue", color = SharkGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text("Tap anywhere to continue", color = SharkNavy, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -175,7 +179,7 @@ fun FeatureTutorialOverlay(title: String, description: String, onDismiss: () -> 
 fun MiniStat(label: String, value: String, positive: Boolean) {
     Column {
         Text(label, color = SharkMuted, fontSize = 11.sp)
-        Text(value, color = if (positive) SharkGreen else SharkRed, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text(value, color = if (positive) SharkNavy else SharkRed, fontSize = 16.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -230,18 +234,18 @@ fun calculateEstimatedTax(taxableIncome: Double): Double {
 }
 
 fun getCategoryColor(name: String): Color = when (name) {
-    "Income"            -> SharkGreen
+    "Income"            -> SharkNavy
     "Bills & Utilities" -> SharkAmber
-    "Entertainment"     -> Color(0xFF8B5CF6)
+    "Entertainment"     -> Color(0xFFBF5AF2)
     "People I Owe"      -> SharkRed
     "Housing"           -> SharkAmber
-    "Utilities"         -> Color(0xFF06B6D4)
-    "Subscriptions"     -> Color(0xFF8B5CF6)
-    "Transport"         -> SharkGreen
+    "Utilities"         -> Color(0xFF64FFDA)
+    "Subscriptions"     -> Color(0xFFBF5AF2)
+    "Transport"         -> SharkNavy
     "Insurance"         -> SharkRed
-    "Savings"           -> SharkGreen
+    "Savings"           -> SharkNavy
     "Emergency"         -> SharkRed
-    "Tech"              -> Color(0xFF8B5CF6)
+    "Tech"              -> Color(0xFFBF5AF2)
     else                -> SharkMuted
 }
 
@@ -254,19 +258,19 @@ data class Bill(
     val recurrence: String = "Monthly",
     val category: String = "Housing",
     val isPaid: Boolean = false,
-    val color: String = "#f59e0b",
+    val color: String = "#0A84FF",
     @ServerTimestamp val createdAt: Date? = null
 )
 
 data class BillCategory(val name: String, val icon: ImageVector, val color: Color)
 
 val billCategories = listOf(
-    BillCategory("Housing",       Icons.Default.Home,           Color(0xFFf59e0b)),
-    BillCategory("Utilities",     Icons.Default.ElectricBolt,   Color(0xFF06b6d4)),
-    BillCategory("Subscriptions", Icons.Default.Subscriptions,  Color(0xFF8b5cf6)),
-    BillCategory("Transport",     Icons.Default.DirectionsCar,  SharkGreen),
+    BillCategory("Housing",       Icons.Default.Home,           Color(0xFFFFD60A)),
+    BillCategory("Utilities",     Icons.Default.ElectricBolt,   Color(0xFF64FFDA)),
+    BillCategory("Subscriptions", Icons.Default.Subscriptions,  Color(0xFFBF5AF2)),
+    BillCategory("Transport",     Icons.Default.DirectionsCar,  SharkNavy),
     BillCategory("Insurance",     Icons.Default.Security,       SharkRed),
-    BillCategory("Other",         Icons.Default.Receipt,        Color(0xFF6b7280))
+    BillCategory("Other",         Icons.Default.Receipt,        Color(0xFF778DA9))
 )
 
 val recurrenceOptions = listOf("Weekly", "Bi-weekly", "Monthly", "One-time")
@@ -280,17 +284,17 @@ data class Goal(
     val category: String = "Savings",
     val deadline: String = "",
     val isCompleted: Boolean = false,
-    val colorHex: String = "#00C853",
+    val colorHex: String = "#0A84FF",
     @ServerTimestamp val createdAt: Date? = null
 )
 
 data class GoalCategory(val name: String, val icon: ImageVector, val color: Color)
 
 val goalCategories = listOf(
-    GoalCategory("Savings",       Icons.Default.Savings,       SharkGreen),
+    GoalCategory("Savings",       Icons.Default.Savings,       SharkNavy),
     GoalCategory("Emergency",     Icons.Default.Shield,         SharkRed),
-    GoalCategory("Something New", Icons.Default.Flight,         Color(0xFF06b6d4)),
-    GoalCategory("Tech",          Icons.Default.Devices,        Color(0xFF8b5cf6)),
+    GoalCategory("Something New", Icons.Default.Flight,         Color(0xFF64FFDA)),
+    GoalCategory("Tech",          Icons.Default.Devices,        Color(0xFFBF5AF2)),
     GoalCategory("Loan",          Icons.Default.School,         SharkAmber),
-    GoalCategory("Other",         Icons.Default.Star,           Color(0xFF6b7280))
+    GoalCategory("Other",         Icons.Default.Star,           Color(0xFF778DA9))
 )
