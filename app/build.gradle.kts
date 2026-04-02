@@ -91,6 +91,8 @@ dependencies {
     implementation(libs.itext.font.asian)
     implementation(libs.itext.hyph)
 
+    implementation("com.airbnb.android:lottie-compose:6.4.0")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

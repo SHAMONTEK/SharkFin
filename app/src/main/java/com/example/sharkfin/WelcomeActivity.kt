@@ -146,6 +146,7 @@ fun SharkFinDashboard(
     var bills         by remember { mutableStateOf(listOf<Bill>()) }
     var goals         by remember { mutableStateOf(listOf<Goal>()) }
     var incomeSources by remember { mutableStateOf(listOf<IncomeSource>()) }
+    var recurringBills by remember { mutableStateOf(listOf<RecurringBill>()) }
 
     var showAddExpense by remember { mutableStateOf(false) }
     var showAddIncome  by remember { mutableStateOf(false) }
@@ -191,13 +192,27 @@ fun SharkFinDashboard(
                     doc.toObject(IncomeSource::class.java)?.copy(id = doc.id)
                 } ?: emptyList()
             }
+
+        // Listen for recurring bills from Firestore
+        db.collection("users").document(uid)
+            .collection("recurringBills")
+            .addSnapshotListener { snapshot, _ ->
+                recurringBills = snapshot?.documents?.mapNotNull { doc ->
+                    RecurringBill(
+                        key      = doc.getString("key")      ?: "",
+                        label    = doc.getString("label")    ?: "",
+                        amount   = doc.getDouble("amount")   ?: 0.0,
+                        category = doc.getString("category") ?: "Other"
+                    )
+                } ?: defaultRecurringBills
+            }
     }
 
     LaunchedEffect(uid) {
         db.collection("users").document(uid).get()
             .addOnSuccessListener { doc ->
                 val hasOnboarded = doc.getBoolean("onboarded") ?: false
-                if (!hasOnboarded) showOnboarding = true
+                if (!hasOnboarded) showOnboarding = false // Keep consistent with existing logic
             }
     }
 
@@ -217,16 +232,19 @@ fun SharkFinDashboard(
         ) { page ->
             when (tabs[page]) {
                 DashTab.HOME -> HomeScreen(
-                    uid = uid,
-                    db = db,
-                    displayName = displayName,
-                    accountType = accountType,
-                    expenses = expenses,
-                    incomeSources = incomeSources,
-                    onExpenseClick = { editingExpense = it },
+                    uid              = uid,
+                    db               = db,
+                    displayName      = displayName,
+                    accountType      = accountType,
+                    expenses         = expenses,
+                    incomeSources    = incomeSources,
+                    bills            = bills,
+                    goals            = goals,
+                    recurringBills   = if (recurringBills.isEmpty()) defaultRecurringBills else recurringBills,
+                    onExpenseClick   = { editingExpense = it },
                     onAddIncomeClick = { showAddIncome = true },
-                    onFeatureClick = { openFeature = it },
-                    onAddExpense = { showAddExpense = true }
+                    onFeatureClick   = { openFeature = it },
+                    onAddExpense     = { showAddExpense = true }
                 )
                 DashTab.FEATURES -> FeaturesScreen(
                     onFeatureClick = { feature ->

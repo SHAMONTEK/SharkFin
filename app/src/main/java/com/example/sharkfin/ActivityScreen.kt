@@ -149,7 +149,8 @@ fun SummaryPill(label: String, amount: Double, color: Color, modifier: Modifier)
 @Composable
 fun TransactionRow(expense: Expense, onClick: () -> Unit) {
     val categoryColor = getCategoryColor(expense.category)
-    val dateStr = SimpleDateFormat("MMM dd, yyyy", Locale.US).format(expense.createdAt ?: Date())
+    // CRASH FIX: Use createdAtDate which handles all timestamp types safely
+    val dateStr = SimpleDateFormat("MMM dd, yyyy", Locale.US).format(expense.createdAtDate)
 
     Row(
         modifier = Modifier

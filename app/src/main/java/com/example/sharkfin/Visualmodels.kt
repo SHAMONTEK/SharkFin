@@ -106,18 +106,22 @@ fun HealthScoreCard(expenses: List<Expense>, bills: List<Bill>, goals: List<Goal
     val totalSpend = expenses.filter { it.category != "Income" }.sumOf { it.amount }
 
     // Logic: Savings Rate (40%) + Goal Pace (40%) + Bill Burden (20%)
-    val savingsRate = if (totalIncome > 0) ((totalIncome - totalSpend) / totalIncome).coerceIn(0.0, 1.0) else 0.0
+    val rawSavingsRate = if (totalIncome > 0 && totalIncome.isFinite()) ((totalIncome - totalSpend) / totalIncome) else 0.0
+    val savingsRate = if (rawSavingsRate.isNaN()) 0.0 else rawSavingsRate.coerceIn(0.0, 1.0)
+    
     val goalsOnPace = if (goals.isNotEmpty()) {
         val activeGoals = goals.filter { !it.isCompleted }
         if (activeGoals.isEmpty()) 1.0
         else {
-            // Check if user has saved at least 10% of total target of active goals
             val totalTarget = activeGoals.sumOf { it.targetAmount }
             val totalSaved = activeGoals.sumOf { it.savedAmount }
-            if (totalTarget > 0) (totalSaved / totalTarget).coerceIn(0.0, 1.0) else 1.0
+            val rawPace = if (totalTarget > 0 && totalTarget.isFinite()) (totalSaved / totalTarget) else 1.0
+            if (rawPace.isNaN()) 1.0 else rawPace.coerceIn(0.0, 1.0)
         }
     } else 1.0
-    val billBurden = if (totalIncome > 0) (1.0 - (bills.sumOf { it.amount } / totalIncome)).coerceIn(0.0, 1.0) else 1.0
+    
+    val rawBillBurden = if (totalIncome > 0 && totalIncome.isFinite()) (1.0 - (bills.sumOf { it.amount } / totalIncome)) else 1.0
+    val billBurden = if (rawBillBurden.isNaN()) 1.0 else rawBillBurden.coerceIn(0.0, 1.0)
 
     val score = ((savingsRate * 40) + (goalsOnPace * 40) + (billBurden * 20)).toInt().coerceIn(0, 100)
     val scoreColor = when {
@@ -166,7 +170,8 @@ fun DonutChartWithDrilldown(expenses: List<Expense>, selectedCategory: String?, 
             Canvas(modifier = Modifier.size(140.dp)) {
                 var startAngle = -90f
                 categories.forEach { (name, amount) ->
-                    val sweep = (amount.toFloat() / (if(total == 0f) 1f else total)) * 360f
+                    val rawSweep = (amount.toFloat() / (if(total == 0f || !total.isFinite()) 1f else total)) * 360f
+                    val sweep = if (rawSweep.isNaN() || !rawSweep.isFinite()) 0f else rawSweep
                     val color = getCategoryColor(name)
                     drawArc(
                         color = if (selectedCategory == null || selectedCategory == name) color else color.copy(alpha = 0.2f),
@@ -182,12 +187,14 @@ fun DonutChartWithDrilldown(expenses: List<Expense>, selectedCategory: String?, 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(selectedCategory, color = Color.White, fontSize = 12.sp)
                     val amount = categories[selectedCategory] ?: 0.0
-                    Text("$${String.format("%.0f", amount)}", color = Color.White, fontWeight = FontWeight.Bold)
+                    val amountText = if (amount.isInfinite() || amount.isNaN()) "Large" else String.format("%.0f", amount)
+                    Text("$${amountText}", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Total Spend", color = SharkMuted, fontSize = 11.sp)
-                    Text("$${String.format("%.0f", total)}", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    val totalText = if (total.isInfinite() || total.isNaN()) "Large" else String.format("%.0f", total)
+                    Text("$${totalText}", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -213,7 +220,8 @@ fun DonutChartWithDrilldown(expenses: List<Expense>, selectedCategory: String?, 
             filtered.take(3).forEach { exp ->
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(exp.title, color = Color.White, fontSize = 13.sp)
-                    Text("$${String.format("%.2f", exp.amount)}", color = SharkMuted, fontSize = 13.sp)
+                    val expAmountText = if (exp.amount.isInfinite() || exp.amount.isNaN()) "Large" else String.format("%.2f", exp.amount)
+                    Text("$${expAmountText}", color = SharkMuted, fontSize = 13.sp)
                 }
             }
             if (filtered.size > 3) {
@@ -239,9 +247,11 @@ fun FlowBarChart(income: Double, spending: Double, bills: Double, taxes: Double)
 
 @Composable
 fun Bar(label: String, value: Double, max: Double, color: Color) {
-    val heightFactor = (value / max).toFloat().coerceIn(0.01f, 1.0f)
+    val rawFactor = (value / max).toFloat()
+    val heightFactor = if (rawFactor.isNaN() || !rawFactor.isFinite()) 0.01f else rawFactor.coerceIn(0.01f, 1.0f)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("$${String.format("%.0f", value)}", color = color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        val valText = if (value.isInfinite() || value.isNaN()) "Large" else String.format("%.0f", value)
+        Text("$${valText}", color = color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(4.dp))
         Box(modifier = Modifier.width(30.dp).fillMaxHeight(heightFactor).clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)).background(color))
         Spacer(modifier = Modifier.height(8.dp))
@@ -251,7 +261,6 @@ fun Bar(label: String, value: Double, max: Double, color: Color) {
 
 @Composable
 fun TripleTrendChart(expenses: List<Expense>) {
-    // In a real app, we would group expenses by day/week. Here we mock data points.
     val incomePoints = listOf(0.4f, 0.5f, 0.6f, 0.55f, 0.8f, 0.9f, 1.0f)
     val spendPoints = listOf(0.2f, 0.3f, 0.4f, 0.35f, 0.5f, 0.45f, 0.6f)
     val balancePoints = incomePoints.zip(spendPoints) { i, s -> i - s }
@@ -283,7 +292,8 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTrendLine(points: List<
     val stepX = size.width / (points.size - 1)
     points.forEachIndexed { i, p ->
         val x = i * stepX
-        val y = size.height - (p * size.height)
+        val rawY = size.height - (p * size.height)
+        val y = if (rawY.isNaN() || !rawY.isFinite()) size.height else rawY
         if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
     }
     drawPath(path = path, color = color, style = Stroke(width = 4f, cap = StrokeCap.Round))
@@ -300,7 +310,8 @@ fun LegendItem(text: String, color: Color) {
 
 @Composable
 fun ForecastSection(currentNet: Double, avgSpend: Double, income: Double) {
-    val dailyNet = (income - avgSpend) / 30.0
+    val rawDailyNet = (income - avgSpend) / 30.0
+    val dailyNet = if (rawDailyNet.isNaN() || !rawDailyNet.isFinite()) 0.0 else rawDailyNet
 
     Box(modifier = Modifier.fillMaxWidth().glassCard(alpha = 0.1f).padding(20.dp)) {
         Column {
@@ -308,8 +319,9 @@ fun ForecastSection(currentNet: Double, avgSpend: Double, income: Double) {
             ProjectionRow("60 Days", dailyNet * 60)
             ProjectionRow("90 Days", dailyNet * 90)
             Spacer(modifier = Modifier.height(12.dp))
+            val dailyNetText = if (dailyNet.isInfinite() || dailyNet.isNaN()) "0.00" else String.format("%.2f", dailyNet)
             Text(
-                "Based on current velocity of $${String.format("%.2f", dailyNet)}/day",
+                "Based on current velocity of $${dailyNetText}/day",
                 color = SharkGreen,
                 fontSize = 11.sp,
                 modifier = Modifier.fillMaxWidth(),
@@ -323,8 +335,9 @@ fun ForecastSection(currentNet: Double, avgSpend: Double, income: Double) {
 fun ProjectionRow(days: String, amount: Double) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(days, color = Color.White, fontSize = 14.sp)
+        val amountText = if (amount.isInfinite() || amount.isNaN()) "Large" else String.format("%,.2f", amount)
         Text(
-            (if(amount>=0) "+" else "") + "$${String.format("%,.2f", amount)}",
+            (if(amount>=0) "+" else "") + "$${amountText}",
             color = if(amount >= 0) SharkGreen else Color(0xFFef4444),
             fontWeight = FontWeight.Bold
         )

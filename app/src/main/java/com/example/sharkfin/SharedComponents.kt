@@ -8,22 +8,31 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.ServerTimestamp
+import java.text.SimpleDateFormat
 import java.util.*
 
 // ─── Core Colors (Shark Ocean Theme) ───────────────────────────────────────
@@ -76,6 +85,17 @@ fun Modifier.glassCard(cornerRadius: Float = 24f, alpha: Float = 0.08f): Modifie
         )
     )
 
+// ── Mood ──────────────────────────────────────────────────────────────────────
+enum class SharkMood {
+    HAPPY,      // under budget, good score, streak growing
+    NEUTRAL,    // on track, nothing alarming
+    CONCERNED,  // getting close to limit
+    SAD,        // over limit, streak broken
+    PROUD,      // milestone hit, goal completed
+    CURIOUS,    // asking for clarification
+    UPSET       // legacy state, mapped to SAD or CONCERNED
+}
+
 // ─── Data Classes ──────────────────────────────────────────────────────────
 data class Expense(
     val id: String = "",
@@ -83,8 +103,16 @@ data class Expense(
     val amount: Double = 0.0,
     val category: String = "Bills & Utilities",
     val note: String = "",
-    @ServerTimestamp val createdAt: Date? = null
-)
+    val createdAt: Any? = null
+) {
+    val createdAtDate: Date
+        get() = when (createdAt) {
+            is Timestamp -> createdAt.toDate()
+            is Date -> createdAt
+            is Long -> Date(createdAt)
+            else -> Date()
+        }
+}
 
 data class IncomeSource(
     val id: String = "",
@@ -97,7 +125,7 @@ data class IncomeSource(
 data class ExpenseCategory(val name: String, val icon: ImageVector, val color: Color)
 
 val expenseCategories = listOf(
-    ExpenseCategory("Income",            Icons.Default.TrendingUp,  SharkNavy),
+    ExpenseCategory("Income",            Icons.AutoMirrored.Filled.TrendingUp,  SharkNavy),
     ExpenseCategory("Bills & Utilities", Icons.Default.Receipt,     SharkAmber),
     ExpenseCategory("Entertainment",     Icons.Default.MusicNote,   Color(0xFFBF5AF2)),
     ExpenseCategory("People I Owe",      Icons.Default.People,      SharkRed)
@@ -259,8 +287,16 @@ data class Bill(
     val category: String = "Housing",
     val isPaid: Boolean = false,
     val color: String = "#0A84FF",
-    @ServerTimestamp val createdAt: Date? = null
-)
+    val createdAt: Any? = null
+) {
+    val createdAtDate: Date
+        get() = when (createdAt) {
+            is Timestamp -> createdAt.toDate()
+            is Date -> createdAt
+            is Long -> Date(createdAt)
+            else -> Date()
+        }
+}
 
 data class BillCategory(val name: String, val icon: ImageVector, val color: Color)
 
@@ -285,8 +321,16 @@ data class Goal(
     val deadline: String = "",
     val isCompleted: Boolean = false,
     val colorHex: String = "#0A84FF",
-    @ServerTimestamp val createdAt: Date? = null
-)
+    val createdAt: Any? = null
+) {
+    val createdAtDate: Date
+        get() = when (createdAt) {
+            is Timestamp -> createdAt.toDate()
+            is Date -> createdAt
+            is Long -> Date(createdAt)
+            else -> Date()
+        }
+}
 
 data class GoalCategory(val name: String, val icon: ImageVector, val color: Color)
 
@@ -298,3 +342,163 @@ val goalCategories = listOf(
     GoalCategory("Loan",          Icons.Default.School,         SharkAmber),
     GoalCategory("Other",         Icons.Default.Star,           Color(0xFF778DA9))
 )
+
+@Composable
+fun SharkChatBubble(
+    message   : String,
+    isShark   : Boolean,   // true = Shark speaking, false = user speaking
+    modifier  : Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = if (isShark) Arrangement.Start else Arrangement.End
+    ) {
+        if (isShark) {
+            // Shark avatar circle
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(SharkGreen.copy(alpha = 0.15f))
+                    .border(1.dp, SharkGreen.copy(alpha = 0.4f), CircleShape)
+                    .align(Alignment.Bottom),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("🦈", fontSize = 13.sp)
+            }
+            Spacer(Modifier.width(8.dp))
+        }
+
+        Box(
+            modifier = Modifier
+                .widthIn(max = 260.dp)
+                .clip(
+                    RoundedCornerShape(
+                        topStart    = if (isShark) 4.dp  else 18.dp,
+                        topEnd      = if (isShark) 18.dp else 4.dp,
+                        bottomStart = 18.dp,
+                        bottomEnd   = 18.dp
+                    )
+                )
+                .background(if (isShark) Color(0xFF111111) else SharkGreen)
+                .border(
+                    width = if (isShark) 1.dp else 0.dp,
+                    color = if (isShark) Color(0xFF2A2A2A) else Color.Transparent,
+                    shape = RoundedCornerShape(
+                        topStart    = if (isShark) 4.dp  else 18.dp,
+                        topEnd      = if (isShark) 18.dp else 4.dp,
+                        bottomStart = 18.dp,
+                        bottomEnd   = 18.dp
+                    )
+                )
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            Text(
+                message,
+                color      = if (isShark) Color.White else Color.Black,
+                fontSize   = 14.sp,
+                lineHeight = 20.sp
+            )
+        }
+
+        if (!isShark) Spacer(Modifier.width(8.dp))
+    }
+}
+
+data class SharkChatMessage(
+    val text    : String,
+    val isShark : Boolean,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+data class RecurringBill(
+    val key      : String,
+    val label    : String,
+    val amount   : Double,
+    val category : String
+)
+
+enum class SharkAgentSession {
+    IDLE,
+    AWAITING_SETUP_BALANCE,
+    AWAITING_SAVINGS_TARGET,
+    AWAITING_PAYDAY,
+    AWAITING_RESET_CONFIRM
+}
+
+@Composable
+fun BillCalendar(
+    bills: List<Bill>,
+    viewMonth: Int,
+    viewYear: Int,
+    today: Calendar,
+    onPrevMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onDayClick: (Int) -> Unit
+) {
+    val cal = Calendar.getInstance().apply { set(viewYear, viewMonth, 1) }
+    val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+    val firstDayOfWeek = (cal.get(Calendar.DAY_OF_WEEK) - 1 + 6) % 7
+    val monthName = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(cal.time)
+    val isCurrentMonth = viewMonth == today.get(Calendar.MONTH) && viewYear == today.get(Calendar.YEAR)
+    val todayDay = today.get(Calendar.DAY_OF_MONTH)
+    val billsByDay = bills.groupBy { it.dayOfMonth }
+
+    Column(modifier = Modifier.fillMaxWidth().glassCard(cornerRadius = 20f, alpha = 0.07f).padding(16.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onPrevMonth) {
+                Text("<", color = SharkMuted, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+            Text(monthName, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            IconButton(onClick = onNextMonth) {
+                Text(">", color = SharkMuted, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            listOf("M", "T", "W", "T", "F", "S", "S").forEach { day ->
+                Text(day, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, color = SharkMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        val totalCells = firstDayOfWeek + daysInMonth
+        val rows = (totalCells + 6) / 7
+        for (row in 0 until rows) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                for (col in 0 until 7) {
+                    val cellIndex = row * 7 + col
+                    val day = cellIndex - firstDayOfWeek + 1
+                    if (day < 1 || day > daysInMonth) {
+                        Box(modifier = Modifier.weight(1f).height(40.dp))
+                    } else {
+                        val billsOnDay = billsByDay[day] ?: emptyList()
+                        val hasBill = billsOnDay.isNotEmpty()
+                        val allPaid = billsOnDay.all { it.isPaid }
+                        val isToday = isCurrentMonth && day == todayDay
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isToday) SharkGreen.copy(alpha = 0.1f) else Color.Transparent)
+                                .clickable { onDayClick(day) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "$day",
+                                    color = if (isToday) SharkGreen else if (hasBill) SharkAmber else Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isToday || hasBill) FontWeight.Bold else FontWeight.Normal
+                                )
+                                if (hasBill) {
+                                    Box(Modifier.size(4.dp).background(if (allPaid) SharkGreen else SharkAmber, CircleShape))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

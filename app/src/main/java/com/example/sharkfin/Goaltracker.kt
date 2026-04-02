@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -138,7 +139,7 @@ fun GoalTrackerScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.TrendingUp, null, tint = SharkNavy, modifier = Modifier.size(16.dp))
+                    Icon(Icons.AutoMirrored.Filled.TrendingUp, null, tint = SharkNavy, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         "You have \$${String.format("%.0f", monthlySurplus)}/mo available to save",
@@ -735,5 +736,35 @@ fun AddGoalSheet(
                 else Text("Create Goal", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         }
+    }
+}
+
+fun addSavingsToGoalByName(
+    uid      : String,
+    db       : FirebaseFirestore,
+    goalName : String,
+    amount   : Double,
+    goals    : List<Goal>
+) {
+    // Find the closest matching goal by name
+    val matched = goals.firstOrNull { goal ->
+        goal.name.equals(goalName, ignoreCase = true) ||
+        goal.name.contains(goalName, ignoreCase = true) ||
+        goalName.contains(goal.name, ignoreCase = true)
+    }
+
+    matched?.let { goal ->
+        val newSaved = goal.savedAmount + amount
+        val isComplete = newSaved >= goal.targetAmount
+
+        db.collection("users").document(uid)
+            .collection("goals")
+            .document(goal.id)
+            .update(
+                mapOf(
+                    "savedAmount"  to newSaved,
+                    "isCompleted"  to isComplete
+                )
+            )
     }
 }
