@@ -93,6 +93,12 @@ dependencies {
 
     implementation("com.airbnb.android:lottie-compose:6.4.0")
 
+    // Vico Charts
+    implementation("com.patrykandpatrick.vico:compose-m3:2.0.0-alpha.22")
+
+    // Gemini
+    implementation(libs.generativeai)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

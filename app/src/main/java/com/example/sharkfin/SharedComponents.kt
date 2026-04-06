@@ -93,7 +93,8 @@ enum class SharkMood {
     SAD,        // over limit, streak broken
     PROUD,      // milestone hit, goal completed
     CURIOUS,    // asking for clarification
-    UPSET       // legacy state, mapped to SAD or CONCERNED
+    UPSET,      // legacy state, mapped to SAD or CONCERNED
+    HUNGRY      // Runway is low, alert mode
 }
 
 // ─── Data Classes ──────────────────────────────────────────────────────────
@@ -103,6 +104,24 @@ data class Expense(
     val amount: Double = 0.0,
     val category: String = "Bills & Utilities",
     val note: String = "",
+    val createdAt: Any? = null
+) {
+    val createdAtDate: Date
+        get() = when (createdAt) {
+            is Timestamp -> createdAt.toDate()
+            is Date -> createdAt
+            is Long -> Date(createdAt)
+            else -> Date()
+        }
+}
+
+// ─── Portfolio Asset Data Class (Investments) ──────────────────────────────
+data class PortfolioAsset(
+    val id: String = "",
+    val symbol: String = "",
+    val quantity: Double = 0.0,
+    val averageCost: Double = 0.0,
+    val assetType: String = "STOCK", // STOCK, CRYPTO, FOREX
     val createdAt: Any? = null
 ) {
     val createdAtDate: Date
@@ -252,13 +271,24 @@ fun ordinal(n: Int): String {
     return "$n$suffix"
 }
 
-fun calculateEstimatedTax(taxableIncome: Double): Double {
-    return when {
+fun calculateEstimatedTax(taxableIncome: Double, stateCode: String = "TX", is1099: Boolean = false): Double {
+    val federal = when {
         taxableIncome <= 11000 -> taxableIncome * 0.10
         taxableIncome <= 44725 -> 1100 + (taxableIncome - 11000) * 0.12
         taxableIncome <= 95375 -> 5147 + (taxableIncome - 44725) * 0.22
         else                   -> 16290 + (taxableIncome - 95375) * 0.24
     }
+    
+    val stateRate = when(stateCode) {
+        "CA" -> 0.09
+        "NY" -> 0.06
+        "TX", "FL", "WA" -> 0.00
+        else -> 0.04
+    }
+    
+    val selfEmployment = if(is1099) taxableIncome * 0.153 else 0.0
+    
+    return federal + (taxableIncome * stateRate) + selfEmployment
 }
 
 fun getCategoryColor(name: String): Color = when (name) {
@@ -342,6 +372,25 @@ val goalCategories = listOf(
     GoalCategory("Loan",          Icons.Default.School,         SharkAmber),
     GoalCategory("Other",         Icons.Default.Star,           Color(0xFF778DA9))
 )
+
+// ─── Debt Data Class (Debt Vanish) ─────────────────────────────────────────
+data class Debt(
+    val id: String = "",
+    val name: String = "",
+    val totalAmount: Double = 0.0,
+    val currentBalance: Double = 0.0,
+    val apr: Double = 0.0,
+    val minimumPayment: Double = 0.0,
+    val createdAt: Any? = null
+) {
+    val createdAtDate: Date
+        get() = when (createdAt) {
+            is Timestamp -> createdAt.toDate()
+            is Date -> createdAt
+            is Long -> Date(createdAt)
+            else -> Date()
+        }
+}
 
 @Composable
 fun SharkChatBubble(

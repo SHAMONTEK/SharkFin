@@ -1,45 +1,53 @@
-# Blueprint: Fin-Pal - Your Personal Finance Companion
+# Blueprint: Sharkfin - AI-Driven Personal CFO
 
 ## 1. Overview
-
-Fin-Pal is a beautiful and intuitive Flutter application designed to help users track their income and expenses, manage their budget, and gain insights into their spending habits. The app will have a modern, clean, and visually appealing interface, with a focus on user experience and accessibility.
+Sharkfin is a premium, AI-driven personal financial management application built for Android. It focuses on real-time tracking, predictive analytics (Freedom Runway), and automated wealth building (Passive Snowball). The app features an integrated AI Coach (NLP) that allows users to manage their finances through natural language.
 
 ## 2. Style and Design
+- **Theme:** "Shark Navy" Premium Dark Theme.
+- **Visuals:** Glassmorphism, Neon accents (SharkGreen, SharkRed, SharkAmber), and Lottie-driven mascot animations.
+- **Mascot:** A reactive Shark mascot that changes moods based on the user's financial health (Money Score).
+- **Core Components:** Glass cards, radial gradients, and animated progress arcs.
 
-- **Theme:** Material 3 with `ColorScheme.fromSeed`.
-- **Color Palette:** A vibrant and energetic look and feel with a primary seed color of deep purple.
-- **Typography:** Expressive and relevant typography using the `google_fonts` package. We'll use Oswald for headings and Open Sans for body text.
-- **Iconography:** Modern and interactive icons from the Material Icons library.
-- **Visual Effects:** Multi-layered drop shadows for a sense of depth, and a soft glow effect for interactive elements.
-- **Texture:** A subtle noise texture will be applied to the main background to add a premium, tactile feel.
-- **Layout:** A visually balanced layout with clean spacing and a responsive design that adapts to different screen sizes.
+## 3. Feature Set (100% Complete)
 
-## 3. Features
+### Core Financial Engine
+- **Expense & Income Tracking:** Real-time logging with Firestore persistence.
+- **Import Statement:** Bulk CSV processing for bank statements.
+- **Bill Tracker:** Calendar-based commitment tracking with automated 2-week reminders.
+- **Goal Tracker:** Progress-based goal setting with "Pace Check" logic.
 
-### Implemented Features
+### Advanced Intelligence
+- **AI Coach (AICoachNLP):** Intent detection for natural language entries (e.g., "Spent $15 at Starbucks").
+- **Freedom Runway:** Real-time calculation of financial safety in days based on average burn rate.
+- **Money Score:** A proprietary health metric (0-100) based on savings rate and debt-to-income ratio.
+- **Tax Tracker:** 2024 bracket estimation and effective rate calculation.
 
-- **Theme Management:**
-  - `ThemeProvider` to manage light and dark modes.
-  - A user-facing theme toggle in the app bar.
-- **Home Screen:**
-  - A welcoming hero section with a large, expressive title.
-  - **Financial Summary Card:** A visually distinct card to show income, expenses, and balance.
-  - **Recent Transactions List:** A scrollable list of recent transactions with icons and styled details, populated with mock data.
-  - **Floating Action Button (FAB):** For adding new transactions.
+### Wealth & Markets
+- **Dividend Tracker:** Specialized module for tracking stock payouts, yields, and ex-dividend dates.
+- **Market Intelligence:** Live terminal for Stocks, Forex, and Crypto with "Benchmark Comparison" (Portfolio vs SPY/QQQ).
+- **Passive Snowball:** Visualizing passive income milestones (e.g., "Dividends now pay for Netflix").
+- **Debt Vanish:** Trajectory engine for visualizing debt elimination paths.
 
-## 4. Project Structure
+## 4. Technical Stack
+- **Language:** Kotlin
+- **UI Framework:** Jetpack Compose
+- **Backend:** Firebase (Auth, Firestore)
+- **Architecture:** MVVM / State-driven Navigation
+- **Animations:** Lottie, Compose Animation API
 
+## 5. Project Structure
 ```
 .
-├── lib
-│   ├── main.dart
-│   ├── theme_provider.dart
-│   ├── home_screen.dart
-│   └── models
-│       └── transaction.dart
-├── assets
-│   └── images
-│       └── noise.png
-├── pubspec.yaml
-└── blueprint.md
+├── app/src/main/java/com/example/sharkfin/
+│   ├── AICoachNLP.kt         // AI Intent Logic
+│   ├── WelcomeActivity.kt    // Main Navigation Router
+│   ├── HomeScreen.kt         // Dashboard & AI Interface
+│   ├── DividendTracker.kt    // Dividend Module
+│   ├── StockForexTracker.kt  // Market Intelligence
+│   ├── Goaltracker.kt        // Goal Management
+│   ├── Billtracker.kt        // Bill & Reminder Logic
+│   ├── SharedComponents.kt   // Data Models & Glass UI
+│   └── ...                   // Specialized Feature Screens
+└── blueprint.md              // Project Specification
 ```

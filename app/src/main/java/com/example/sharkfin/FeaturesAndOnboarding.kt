@@ -106,12 +106,20 @@ fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
             tag         = "BETA"
         ),
         SharkFeature(
+            name        = "Dividend Tracker",
+            icon        = Icons.Default.Payments,
+            color       = SharkNavy,
+            available   = true,
+            description = "Track payouts, yields & ex-dividend dates",
+            tag         = "NEW"
+        ),
+        SharkFeature(
             name        = "Stock/Forex",
             icon        = Icons.Default.CurrencyExchange,
             color       = SharkGreen,
             available   = true,
-            description = "Live market watch — demo mode",
-            tag         = "DEMO"
+            description = "Live market terminal with benchmark mode",
+            tag         = "UPDATED"
         ),
         SharkFeature(
             name        = "Account Settings",
@@ -522,7 +530,8 @@ data class OnboardStep(
     val icon: ImageVector,
     val color: Color,
     val title: String,
-    val body: String
+    val body: String,
+    val isBillSetup: Boolean = false
 )
 
 val onboardingStepsList = listOf(
@@ -535,8 +544,9 @@ val onboardingStepsList = listOf(
     OnboardStep(
         icon  = Icons.Default.Receipt,
         color = Color(0xFFf59e0b),
-        title = "Bills that warn you.",
-        body  = "Add a bill once. SharkFin puts it on the calendar, reminds you 2 weeks out, and deducts it from your projected balance."
+        title = "Let's set your bills.",
+        body  = "Sharkfin works best when it knows your commitments. Pick your common monthly bills to start.",
+        isBillSetup = true
     ),
     OnboardStep(
         icon  = Icons.Default.Flag,
@@ -658,6 +668,11 @@ fun OnboardingScreen(
                     .alpha(alpha)
                     .padding(horizontal = 8.dp)
             )
+
+            if (step.isBillSetup) {
+                Spacer(Modifier.height(24.dp))
+                QuickBillSetupGrid(uid, db)
+            }
 
             Spacer(Modifier.weight(1f))
 

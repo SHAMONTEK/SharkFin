@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,15 +36,15 @@ fun VisualModelsScreen(
     var selectedCategory by remember { mutableStateOf<String?>(null) }
 
     // ── DATA PREP ──────────────────────────────────────────────────────────
-    val totalIncome = expenses.filter { it.category == "Income" }.sumOf { it.amount }
-    val totalSpending = expenses.filter { it.category != "Income" }.sumOf { it.amount }
+    val totalIncome = expenses.filter { it.category == "Income" || it.category == "1099 Income" || it.category == "Passive Income" }.sumOf { it.amount }
+    val totalSpending = expenses.filter { it.category != "Income" && it.category != "Passive Income" }.sumOf { it.amount }
     val totalBills = bills.sumOf { it.amount }
 
     val taxableIncome = (totalIncome - 12000.0).coerceAtLeast(0.0) // simplified deduction
     val estimatedTax = calculateEstimatedTax(taxableIncome)
     val netBalance = totalIncome - totalSpending - estimatedTax
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().background(SharkBlack)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -52,48 +53,39 @@ fun VisualModelsScreen(
         ) {
             Spacer(modifier = Modifier.height(56.dp))
             Text("Living Dashboard", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-            Text("Reactive intelligence powered by your data", color = SharkMuted, fontSize = 13.sp)
+            Text("Financial Survival Engine v1.0", color = SharkMuted, fontSize = 13.sp)
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // ── 1. HEALTH SCORE ──────────────────────────────────────────────
+            // ── 1. Benchmark Battle (Student vs S&P 500) ─────────────────────
+            BenchmarkBattleCard(totalIncome, netBalance)
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ── 2. HEALTH SCORE ──────────────────────────────────────────────
             HealthScoreCard(expenses, bills, goals)
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // ── 2. DONUT WITH DRILL-DOWN ──────────────────────────────────────
+            // ── 3. DONUT WITH DRILL-DOWN ──────────────────────────────────────
             Text("Spending Distribution", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(16.dp))
             DonutChartWithDrilldown(expenses, selectedCategory) { selectedCategory = it }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // ── 3. FOUR-BAR COMPARISON (WITH TAXES) ───────────────────────────
+            // ── 4. FOUR-BAR COMPARISON (WITH TAXES) ───────────────────────────
             Text("Cash Flow Pillars", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(16.dp))
             FlowBarChart(totalIncome, totalSpending, totalBills, estimatedTax)
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // ── 4. TRIPLE TREND LINE ──────────────────────────────────────────
-            Text("Growth Trends", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.height(16.dp))
-            TripleTrendChart(expenses)
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // ── 5. PROJECTIONS ────────────────────────────────────────────────
-            Text("Future Forecast", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.height(16.dp))
-            ForecastSection(netBalance, totalSpending, totalIncome)
 
             Spacer(modifier = Modifier.height(120.dp))
         }
 
         if (showTutorial) {
             FeatureTutorialOverlay(
-                title = "Living Intelligence",
-                description = "This isn't just a chart—it's a story. Every expense you add updates your Health Score and future projections in real-time.",
+                title = "Financial Survival Engine",
+                description = "We don't just track pennies. We track your freedom. Compare your growth against Wall Street and watch your Passive Snowball grow.",
                 onDismiss = { showTutorial = false }
             )
         }
@@ -101,11 +93,67 @@ fun VisualModelsScreen(
 }
 
 @Composable
-fun HealthScoreCard(expenses: List<Expense>, bills: List<Bill>, goals: List<Goal>) {
-    val totalIncome = expenses.filter { it.category == "Income" }.sumOf { it.amount }
-    val totalSpend = expenses.filter { it.category != "Income" }.sumOf { it.amount }
+fun BenchmarkBattleCard(income: Double, net: Double) {
+    val userGrowth = if (income > 0) (net / income) * 100 else 0.0
+    val sp500Growth = 8.5 // Simulated YTD S&P 500
+    
+    Box(modifier = Modifier.fillMaxWidth().glassCard(alpha = 0.1f).padding(20.dp)) {
+        Column {
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                Text("BENCHMARK BATTLE", color = SharkMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                if (userGrowth > sp500Growth) {
+                    Text("BEATING THE WHALES 🐋", color = SharkGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            
+            Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(24.dp)) {
+                Column {
+                    Text("YOU", color = SharkNavy, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("${String.format(Locale.US, "%.1f", userGrowth)}%", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                }
+                Column {
+                    Text("S&P 500", color = SharkMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("${sp500Growth}%", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            
+            Spacer(Modifier.height(24.dp))
+            
+            // High-performance Custom Chart (Instead of Vico for now to avoid dependency sync issues)
+            Box(modifier = Modifier.height(120.dp).fillMaxWidth()) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val userPoints = listOf(0.1f, 0.2f, 0.4f, 0.3f, 0.7f, 1.0f)
+                    val spPoints = listOf(0.2f, 0.3f, 0.35f, 0.5f, 0.6f, 0.8f)
+                    
+                    drawTrendLine(spPoints, SharkMuted.copy(alpha = 0.5f))
+                    drawTrendLine(userPoints, SharkNavy)
+                }
+            }
+            
+            Spacer(Modifier.height(12.dp))
+            Text("Democratizing the 'Rich Man\\'s' metric.", color = SharkMuted, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
 
-    // Logic: Savings Rate (40%) + Goal Pace (40%) + Bill Burden (20%)
+fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTrendLine(points: List<Float>, color: Color) {
+    if (points.size < 2) return
+    val path = Path()
+    val stepX = size.width / (points.size - 1)
+    points.forEachIndexed { i, p ->
+        val x = i * stepX
+        val y = size.height - (p * size.height)
+        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+    }
+    drawPath(path = path, color = color, style = Stroke(width = 4f, cap = StrokeCap.Round))
+}
+
+@Composable
+fun HealthScoreCard(expenses: List<Expense>, bills: List<Bill>, goals: List<Goal>) {
+    val totalIncome = expenses.filter { it.category == "Income" || it.category == "1099 Income" || it.category == "Passive Income" }.sumOf { it.amount }
+    val totalSpend = expenses.filter { it.category != "Income" && it.category != "Passive Income" }.sumOf { it.amount }
+
     val rawSavingsRate = if (totalIncome > 0 && totalIncome.isFinite()) ((totalIncome - totalSpend) / totalIncome) else 0.0
     val savingsRate = if (rawSavingsRate.isNaN()) 0.0 else rawSavingsRate.coerceIn(0.0, 1.0)
     
@@ -134,7 +182,7 @@ fun HealthScoreCard(expenses: List<Expense>, bills: List<Bill>, goals: List<Goal
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(80.dp)) {
                 CircularProgressIndicator(
-                    progress = score / 100f,
+                    progress = { score / 100f },
                     modifier = Modifier.fillMaxSize(),
                     color = scoreColor,
                     strokeWidth = 8.dp,
@@ -161,7 +209,7 @@ fun HealthScoreCard(expenses: List<Expense>, bills: List<Bill>, goals: List<Goal
 
 @Composable
 fun DonutChartWithDrilldown(expenses: List<Expense>, selectedCategory: String?, onCategorySelect: (String?) -> Unit) {
-    val spendingExpenses = expenses.filter { it.category != "Income" }
+    val spendingExpenses = expenses.filter { it.category != "Income" && it.category != "Passive Income" }
     val categories = spendingExpenses.groupBy { it.category }.mapValues { it.value.sumOf { e -> e.amount } }
     val total = categories.values.sum().toFloat()
 
@@ -187,14 +235,12 @@ fun DonutChartWithDrilldown(expenses: List<Expense>, selectedCategory: String?, 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(selectedCategory, color = Color.White, fontSize = 12.sp)
                     val amount = categories[selectedCategory] ?: 0.0
-                    val amountText = if (amount.isInfinite() || amount.isNaN()) "Large" else String.format("%.0f", amount)
-                    Text("$${amountText}", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(String.format(Locale.US, "$%.0f", amount), color = Color.White, fontWeight = FontWeight.Bold)
                 }
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Total Spend", color = SharkMuted, fontSize = 11.sp)
-                    val totalText = if (total.isInfinite() || total.isNaN()) "Large" else String.format("%.0f", total)
-                    Text("$${totalText}", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text(String.format(Locale.US, "$%.0f", total), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -210,22 +256,6 @@ fun DonutChartWithDrilldown(expenses: List<Expense>, selectedCategory: String?, 
                         .background(getCategoryColor(name), CircleShape)
                         .clickable { if (selectedCategory == name) onCategorySelect(null) else onCategorySelect(name) }
                 )
-            }
-        }
-
-        if (selectedCategory != null) {
-            Spacer(modifier = Modifier.height(20.dp))
-            Text("Transactions: $selectedCategory", color = SharkGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            val filtered = spendingExpenses.filter { it.category == selectedCategory }
-            filtered.take(3).forEach { exp ->
-                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(exp.title, color = Color.White, fontSize = 13.sp)
-                    val expAmountText = if (exp.amount.isInfinite() || exp.amount.isNaN()) "Large" else String.format("%.2f", exp.amount)
-                    Text("$${expAmountText}", color = SharkMuted, fontSize = 13.sp)
-                }
-            }
-            if (filtered.size > 3) {
-                Text("...and ${filtered.size - 3} more", color = SharkMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }
@@ -250,96 +280,10 @@ fun Bar(label: String, value: Double, max: Double, color: Color) {
     val rawFactor = (value / max).toFloat()
     val heightFactor = if (rawFactor.isNaN() || !rawFactor.isFinite()) 0.01f else rawFactor.coerceIn(0.01f, 1.0f)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        val valText = if (value.isInfinite() || value.isNaN()) "Large" else String.format("%.0f", value)
-        Text("$${valText}", color = color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Text(String.format(Locale.US, "$%.0f", value), color = color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(4.dp))
         Box(modifier = Modifier.width(30.dp).fillMaxHeight(heightFactor).clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)).background(color))
         Spacer(modifier = Modifier.height(8.dp))
         Text(label, color = SharkMuted, fontSize = 10.sp)
-    }
-}
-
-@Composable
-fun TripleTrendChart(expenses: List<Expense>) {
-    val incomePoints = listOf(0.4f, 0.5f, 0.6f, 0.55f, 0.8f, 0.9f, 1.0f)
-    val spendPoints = listOf(0.2f, 0.3f, 0.4f, 0.35f, 0.5f, 0.45f, 0.6f)
-    val balancePoints = incomePoints.zip(spendPoints) { i, s -> i - s }
-
-    Box(modifier = Modifier.fillMaxWidth().height(200.dp).glassCard(alpha = 0.05f).padding(16.dp)) {
-        Column {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                LegendItem("Income", SharkGreen)
-                Spacer(modifier = Modifier.width(12.dp))
-                LegendItem("Spend", Color(0xFFef4444))
-                Spacer(modifier = Modifier.width(12.dp))
-                LegendItem("Net", Color.White)
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                drawTrendLine(incomePoints, SharkGreen)
-                drawTrendLine(spendPoints, Color(0xFFef4444))
-                drawTrendLine(balancePoints, Color.White)
-            }
-        }
-    }
-}
-
-fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTrendLine(points: List<Float>, color: Color) {
-    if (points.size < 2) return
-    val path = Path()
-    val stepX = size.width / (points.size - 1)
-    points.forEachIndexed { i, p ->
-        val x = i * stepX
-        val rawY = size.height - (p * size.height)
-        val y = if (rawY.isNaN() || !rawY.isFinite()) size.height else rawY
-        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-    }
-    drawPath(path = path, color = color, style = Stroke(width = 4f, cap = StrokeCap.Round))
-}
-
-@Composable
-fun LegendItem(text: String, color: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(text, color = SharkMuted, fontSize = 9.sp)
-    }
-}
-
-@Composable
-fun ForecastSection(currentNet: Double, avgSpend: Double, income: Double) {
-    val rawDailyNet = (income - avgSpend) / 30.0
-    val dailyNet = if (rawDailyNet.isNaN() || !rawDailyNet.isFinite()) 0.0 else rawDailyNet
-
-    Box(modifier = Modifier.fillMaxWidth().glassCard(alpha = 0.1f).padding(20.dp)) {
-        Column {
-            ProjectionRow("30 Days", dailyNet * 30)
-            ProjectionRow("60 Days", dailyNet * 60)
-            ProjectionRow("90 Days", dailyNet * 90)
-            Spacer(modifier = Modifier.height(12.dp))
-            val dailyNetText = if (dailyNet.isInfinite() || dailyNet.isNaN()) "0.00" else String.format("%.2f", dailyNet)
-            Text(
-                "Based on current velocity of $${dailyNetText}/day",
-                color = SharkGreen,
-                fontSize = 11.sp,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-@Composable
-fun ProjectionRow(days: String, amount: Double) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(days, color = Color.White, fontSize = 14.sp)
-        val amountText = if (amount.isInfinite() || amount.isNaN()) "Large" else String.format("%,.2f", amount)
-        Text(
-            (if(amount>=0) "+" else "") + "$${amountText}",
-            color = if(amount >= 0) SharkGreen else Color(0xFFef4444),
-            fontWeight = FontWeight.Bold
-        )
     }
 }

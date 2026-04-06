@@ -23,7 +23,9 @@ data class SharkFinancialState(
     val knownRecurring    : List<RecurringBill> = defaultRecurringBills,
     val upcomingBills     : List<Bill>    = emptyList(),
     val activeGoals       : List<Goal>    = emptyList(),
-    val expenses          : List<Expense> = emptyList()
+    val expenses          : List<Expense> = emptyList(),
+    val averageDailyBurn  : Double = 0.0, // average daily spending for Runway calculation
+    val totalDebt         : Double = 0.0  // total debt for Trajectory Engine
 )
 
 // ── Response Types ────────────────────────────────────────────────────────────
@@ -38,7 +40,8 @@ data class SharkResponse(
     val askFollowUp  : String? = null,      // follow-up question to display
     val calendarNote : String? = null,      // text to save to calendar for this date
     val calendarDate : Long?  = null,       // which date to put the note on
-    val performReset : Boolean = false      // should the app wipe expenses/streak?
+    val performReset : Boolean = false,      // should the app wipe expenses/streak?
+    val navigateTo   : String? = null       // Screen name to deep-link to
 )
 
 // ── Main Response Engine ──────────────────────────────────────────────────────
@@ -50,7 +53,9 @@ object AICoachResponse {
         state  : SharkFinancialState
     ): SharkResponse {
 
+        // 11-LINE UPGRADE: Intent-based response logic refinement
         return when (parsed.intent) {
+            TransactionIntent.HUSTLE_INCOME      -> handleHustleIncome(parsed, state)
             TransactionIntent.INCOME             -> handleIncome(parsed, state)
             TransactionIntent.EXPENSE            -> handleExpense(parsed, state)
             TransactionIntent.RECURRING_EXPENSE  -> handleRecurring(parsed, state)
@@ -61,6 +66,8 @@ object AICoachResponse {
             TransactionIntent.NOTE               -> handleNote(parsed, state)
             TransactionIntent.RESET_DATA         -> handleReset(parsed, state)
             TransactionIntent.SETUP_FINANCES     -> handleSetup(parsed, state)
+            TransactionIntent.DEBT_PAYMENT       -> handleDebtPayment(parsed, state)
+            TransactionIntent.CORRECTION         -> handleCorrection(parsed, state)
             TransactionIntent.UNCLEAR            -> handleUnclear(parsed, state)
         }
     }
@@ -122,6 +129,39 @@ object AICoachResponse {
         )
     }
 
+    // ── Hustle Income Handler (NLP Engine) ────────────────────────────────────
+
+    private fun handleHustleIncome(parsed: ParsedTransaction, state: SharkFinancialState): SharkResponse {
+        val amount = parsed.amount
+        if (amount == null) {
+            return SharkResponse(
+                message = "Nice hustle. How much did you pull in?",
+                mood = SharkMood.CURIOUS,
+                logTransaction = false,
+                askFollowUp = "How much did you make?"
+            )
+        }
+
+        val tax = parsed.taxWithholding ?: (amount * 0.20)
+        val runwayExtended = if (state.averageDailyBurn > 0) (amount / state.averageDailyBurn).toInt() else 0
+        
+        val message = buildString {
+            append("\$${fmt(amount)} logged. ")
+            append("I've set aside \$${fmt(tax)} (20%) for taxes. ")
+            if (runwayExtended > 0) {
+                append("This just extended your Freedom Clock by $runwayExtended day${if (runwayExtended == 1) "" else "s"}. ")
+            }
+            append("Keep that momentum.")
+        }
+
+        return SharkResponse(
+            message = message,
+            mood = SharkMood.HAPPY,
+            logTransaction = true,
+            updatedAmount = amount
+        )
+    }
+
     // ── Income Handler ────────────────────────────────────────────────────────
 
     private fun handleIncome(parsed: ParsedTransaction, state: SharkFinancialState): SharkResponse {
@@ -139,7 +179,9 @@ object AICoachResponse {
             )
         }
 
+        val isDividend = parsed.rawInput.contains("dividend")
         val source = when {
+            isDividend -> "from dividends"
             merchant != null -> "from $merchant"
             parsed.rawInput.contains("mom")    -> "from your mom"
             parsed.rawInput.contains("dad")    -> "from your dad"
@@ -166,6 +208,9 @@ object AICoachResponse {
             append("\$${fmt(amount)} in")
             if (source.isNotEmpty()) append(" $source")
             append(". ")
+            if (isDividend) {
+                append("Your Passive Snowball is growing. ")
+            }
             append("Balance: \$${fmt(newBal)}.")
             if (dailyUpdateMsg.isNotEmpty()) append(dailyUpdateMsg)
             append(motivate(mood, state.currentStreak))
@@ -185,21 +230,14 @@ object AICoachResponse {
         val amount    = parsed.amount
         val remaining = state.dailyBudget - state.dailySpentSoFar
 
-        if (amount == null && parsed.amountIsApprox) {
+        // UPGRADE: Aggressive confirmation for uncertain expense amounts
+        if (amount == null || parsed.needsConfirm) {
+            val q = if (parsed.merchantHint != null) "for ${parsed.merchantHint}?" else ""
             return SharkResponse(
-                message     = "You said about how much? Lock in the number.",
-                mood        = SharkMood.CURIOUS,
+                message = "I think you spent money $q — but I didn't catch the amount. How much was it?",
+                mood = SharkMood.CURIOUS,
                 logTransaction = false,
                 askFollowUp = "Exact amount?"
-            )
-        }
-
-        if (amount == null) {
-            return SharkResponse(
-                message     = "How much was it?",
-                mood        = SharkMood.CURIOUS,
-                logTransaction = false,
-                askFollowUp = "What was the amount?"
             )
         }
 
@@ -208,6 +246,13 @@ object AICoachResponse {
         val wentOver        = leftToday < 0
         val tipMsg          = if (parsed.tipAmount != null) " Plus \$${fmt(parsed.tipAmount)} tip." else ""
         val merchant        = parsed.merchantHint?.let { " at $it" } ?: ""
+
+        // Proactive Protection: Shark Guardrail
+        val currentRunway = if (state.averageDailyBurn > 0) (state.balance / state.averageDailyBurn).toInt() else 999
+        val newRunway = if (state.averageDailyBurn > 0) ((state.balance - amount) / state.averageDailyBurn).toInt() else 999
+        val runwayLoss = currentRunway - newRunway
+
+        val isHungry = newRunway < 7
 
         // Streak impact
         val streakMsg = when {
@@ -220,7 +265,8 @@ object AICoachResponse {
             else -> ""
         }
 
-        val mood = when {
+        var mood = when {
+            isHungry          -> SharkMood.HUNGRY
             wentOver          -> SharkMood.SAD
             leftToday < 5     -> SharkMood.CONCERNED
             leftToday > state.dailyBudget * 0.5 -> SharkMood.HAPPY
@@ -228,6 +274,9 @@ object AICoachResponse {
         }
 
         val message = buildString {
+            if (isHungry) {
+                append("This purchase kills $runwayLoss days of freedom. ")
+            }
             append("\$${fmt(amount)} logged$merchant.")
             append(tipMsg)
             if (wentOver) {
@@ -236,13 +285,17 @@ object AICoachResponse {
                 append(" \$${fmt(leftToday)} left today.")
             }
             append(streakMsg)
+            if (isHungry) {
+                append(" Proceed?")
+            }
         }
 
         return SharkResponse(
             message        = message,
             mood           = mood,
             logTransaction = true,
-            updatedAmount  = amount
+            updatedAmount  = amount,
+            askFollowUp    = if (isHungry) "Confirm purchase?" else null
         )
     }
 
@@ -395,6 +448,54 @@ object AICoachResponse {
         )
     }
 
+    // ── Debt Payment Handler (Trajectory Engine) ──────────────────────────────
+
+    private fun handleDebtPayment(parsed: ParsedTransaction, state: SharkFinancialState): SharkResponse {
+        val amount = parsed.amount
+        if (amount == null) {
+            return SharkResponse(
+                message = "How much did you pay towards your debt?",
+                mood = SharkMood.CURIOUS,
+                logTransaction = false,
+                askFollowUp = "Amount paid?"
+            )
+        }
+
+        val remainingDebt = state.totalDebt - amount
+        val message = buildString {
+            append("\$${fmt(amount)} paid towards your debt. ")
+            append("That just moved your freedom date up. ")
+            if (remainingDebt > 0) {
+                append("Total debt remaining: \$${fmt(remainingDebt)}.")
+            } else {
+                append("Debt free! That's what I'm talking about.")
+            }
+        }
+
+        return SharkResponse(
+            message = message,
+            mood = SharkMood.HAPPY,
+            logTransaction = true,
+            updatedAmount = amount
+        )
+    }
+
+    // ── Correction Handler ────────────────────────────────────────────────────
+
+    private fun handleCorrection(parsed: ParsedTransaction, state: SharkFinancialState): SharkResponse {
+        val amount = parsed.amount
+        return SharkResponse(
+            message = if (amount != null)
+                "Correction received. Updating that to \$${fmt(amount)}. I've adjusted the records."
+            else
+                "You want to fix something? Tell me the correct amount or what I got wrong.",
+            mood = SharkMood.NEUTRAL,
+            logTransaction = true,
+            updatedAmount = amount,
+            askFollowUp = if (amount == null) "What's the correct amount?" else null
+        )
+    }
+
     // ── Note Handler ─────────────────────────────────────────────────────────
 
     private fun handleNote(parsed: ParsedTransaction, state: SharkFinancialState): SharkResponse {
@@ -414,19 +515,19 @@ object AICoachResponse {
 
         val message = when {
             hasAmount ->
-                "Got \$${fmt(parsed.amount!!)} — was that money in or money out?"
+                "I caught the \$${fmt(parsed.amount!!)} — but what was it for? Did you spend it or get paid?"
             parsed.rawInput.contains("rent") || parsed.rawInput.contains("car") ||
                     parsed.rawInput.contains("light") || parsed.rawInput.contains("bill") ->
-                "Was that a bill payment or just a heads up?"
+                "I heard you mention a bill — was that a payment you just made?"
             else ->
-                "Run that back — did you spend or receive money?"
+                "Run that back — I didn't quite catch the intent. What's happening with your money?"
         }
 
         return SharkResponse(
             message        = message,
             mood           = SharkMood.CURIOUS,
             logTransaction = false,
-            askFollowUp    = message
+            askFollowUp    = "What was that for?"
         )
     }
 
@@ -531,6 +632,7 @@ object AICoachResponse {
             SharkMood.SAD      -> " Tomorrow we reset."
             SharkMood.CURIOUS  -> ""
             SharkMood.UPSET    -> " Move careful today."
+            SharkMood.HUNGRY   -> " Focus on the goal."
         }
     }
 }

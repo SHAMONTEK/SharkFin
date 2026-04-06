@@ -145,8 +145,10 @@ fun SharkFinDashboard(
     var expenses      by remember { mutableStateOf(listOf<Expense>()) }
     var bills         by remember { mutableStateOf(listOf<Bill>()) }
     var goals         by remember { mutableStateOf(listOf<Goal>()) }
+    var debts         by remember { mutableStateOf(listOf<Debt>()) }
     var incomeSources by remember { mutableStateOf(listOf<IncomeSource>()) }
     var recurringBills by remember { mutableStateOf(listOf<RecurringBill>()) }
+    var portfolio     by remember { mutableStateOf(listOf<PortfolioAsset>()) }
 
     var showAddExpense by remember { mutableStateOf(false) }
     var showAddIncome  by remember { mutableStateOf(false) }
@@ -184,6 +186,15 @@ fun SharkFinDashboard(
                 } ?: emptyList()
             }
 
+        // Listen for Debts
+        db.collection("users").document(uid)
+            .collection("debts")
+            .addSnapshotListener { snapshot, _ ->
+                debts = snapshot?.documents?.mapNotNull { doc ->
+                    doc.toObject(Debt::class.java)?.copy(id = doc.id)
+                } ?: emptyList()
+            }
+
         // Listen for Income Sources
         db.collection("users").document(uid)
             .collection("incomeSources")
@@ -206,13 +217,22 @@ fun SharkFinDashboard(
                     )
                 } ?: defaultRecurringBills
             }
+
+        // Listen for Portfolio
+        db.collection("users").document(uid)
+            .collection("portfolio")
+            .addSnapshotListener { snapshot, _ ->
+                portfolio = snapshot?.documents?.mapNotNull { doc ->
+                    doc.toObject(PortfolioAsset::class.java)?.copy(id = doc.id)
+                } ?: emptyList()
+            }
     }
 
     LaunchedEffect(uid) {
         db.collection("users").document(uid).get()
             .addOnSuccessListener { doc ->
                 val hasOnboarded = doc.getBoolean("onboarded") ?: false
-                if (!hasOnboarded) showOnboarding = false // Keep consistent with existing logic
+                showOnboarding = !hasOnboarded
             }
     }
 
@@ -238,8 +258,10 @@ fun SharkFinDashboard(
                     accountType      = accountType,
                     expenses         = expenses,
                     incomeSources    = incomeSources,
+                    portfolio        = portfolio,
                     bills            = bills,
                     goals            = goals,
+                    debts            = debts,
                     recurringBills   = if (recurringBills.isEmpty()) defaultRecurringBills else recurringBills,
                     onExpenseClick   = { editingExpense = it },
                     onAddIncomeClick = { showAddIncome = true },
@@ -310,8 +332,13 @@ fun SharkFinDashboard(
                     "Visual Models"    -> VisualModelsScreen(expenses, bills, goals)
                     "Import Statement" -> ImportStatementScreen(uid, db) { openFeature = null }
                     "Tax Tracker"      -> TaxTrackerScreen(expenses)
+                    "Dividend Tracker" -> DividendTrackerScreen(uid, db, portfolio)
                     "Inflation Calc"   -> InflationCalcScreen()
-                    "Stock/Forex"      -> StockForexScreen()
+                    "AI Prediction"    -> AiPredictionScreen(expenses, incomeSources, bills)
+                    "Stock/Forex"      -> StockForexScreen(uid, db, portfolio)
+                    "Passive Snowball" -> PassiveSnowballScreen(uid, db, expenses, bills)
+                    "Debt Vanish"      -> DebtVanishScreen(uid, db, debts)
+                    "Freedom Runway"   -> FreedomRunwayScreen(expenses, bills)
                     "Profile"          -> ProfileSettingsScreen(displayName, onUpdateProfile)
                     "Account Settings" -> AccountSettingsScreen()
                     else               -> ComingSoonPlaceholder(openFeature!!)

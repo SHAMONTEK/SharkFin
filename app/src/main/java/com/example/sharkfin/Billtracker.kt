@@ -32,6 +32,67 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun QuickBillSetupGrid(uid: String, db: FirebaseFirestore) {
+    val suggestedBills = listOf(
+        RecurringBill("rent", "Rent", 1200.0, "Housing"),
+        RecurringBill("car_note", "Car Payment", 400.0, "Transit"),
+        RecurringBill("light", "Electric", 120.0, "Utilities"),
+        RecurringBill("water", "Water", 60.0, "Utilities"),
+        RecurringBill("internet", "Internet", 80.0, "Utilities"),
+        RecurringBill("phone", "Phone", 70.0, "Utilities"),
+        RecurringBill("netflix", "Netflix", 16.0, "Entertainment"),
+        RecurringBill("spotify", "Spotify", 10.0, "Entertainment")
+    )
+
+    var selectedKeys by remember { mutableStateOf(setOf<String>()) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text("TAP TO ADD COMMON BILLS", color = SharkMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        Spacer(Modifier.height(12.dp))
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            suggestedBills.forEach { bill ->
+                val isSelected = selectedKeys.contains(bill.key)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isSelected) SharkGreen.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.05f))
+                        .border(1.dp, if (isSelected) SharkGreen else Color.Transparent, RoundedCornerShape(12.dp))
+                        .clickable {
+                            if (isSelected) {
+                                selectedKeys = selectedKeys - bill.key
+                            } else {
+                                selectedKeys = selectedKeys + bill.key
+                                db.collection("users").document(uid).collection("bills").add(
+                                    Bill(
+                                        name = bill.label,
+                                        amount = bill.amount,
+                                        dayOfMonth = 1,
+                                        category = bill.category,
+                                        recurrence = "Monthly",
+                                        isPaid = false
+                                    )
+                                )
+                            }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (isSelected) Icon(Icons.Default.Check, null, tint = SharkGreen, modifier = Modifier.size(14.dp))
+                        if (isSelected) Spacer(Modifier.width(4.dp))
+                        Text(bill.label, color = if (isSelected) SharkGreen else Color.White, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BillTrackerScreen(
@@ -290,21 +351,47 @@ fun CategoryPill(name: String, isSelected: Boolean, onClick: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BillDetailSheet(bill: Bill, uid: String, db: FirebaseFirestore, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf(bill.name) }
+    var amount by remember { mutableStateOf(bill.amount.toString()) }
+    var day by remember { mutableStateOf(bill.dayOfMonth.toString()) }
+    var selectedCategory by remember { mutableStateOf(bill.category) }
+    val scope = rememberCoroutineScope()
+
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = SharkSurface) {
-        Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(bill.name, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text(bill.category, color = SharkMuted)
-            Spacer(Modifier.height(24.dp))
-            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                Text("Amount", color = SharkMuted)
-                Text("$${bill.amount}", color = Color.White, fontWeight = FontWeight.Bold)
+        Column(modifier = Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Edit Bill", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            
+            SheetInputField(name, { name = it }, "BILL NAME", "e.g. Rent")
+            SheetInputField(amount, { amount = it }, "AMOUNT", "0.00", KeyboardType.Decimal)
+            SheetInputField(day, { day = it }, "DUE DAY (1-31)", "1", KeyboardType.Number)
+
+            Text("CATEGORY", color = SharkMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                billCategories.take(4).forEach { cat ->
+                    CategoryPill(cat.name, selectedCategory == cat.name) { selectedCategory = cat.name }
+                }
             }
-            Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                Text("Due Date", color = SharkMuted)
-                Text("Every ${ordinal(bill.dayOfMonth)}", color = Color.White)
+
+            Spacer(Modifier.height(8.dp))
+
+            Button(
+                onClick = {
+                    db.collection("users").document(uid)
+                        .collection("bills").document(bill.id)
+                        .update(mapOf(
+                            "name" to name,
+                            "amount" to (amount.toDoubleOrNull() ?: bill.amount),
+                            "dayOfMonth" to (day.toIntOrNull() ?: bill.dayOfMonth),
+                            "category" to selectedCategory
+                        )).addOnSuccessListener { onDismiss() }
+                },
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = SharkGreen),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text("Update Bill", color = Color.Black, fontWeight = FontWeight.Bold)
             }
-            Spacer(Modifier.height(32.dp))
+
             Button(
                 onClick = {
                     db.collection("users").document(uid).collection("bills").document(bill.id).delete()
