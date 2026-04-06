@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.Canvas
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 // ─── Goal Tracker Screen ───────────────────────────────────────────────────
@@ -43,6 +44,17 @@ fun GoalTrackerScreen(
 ) {
     var showAddGoal   by remember { mutableStateOf(false) }
     var selectedGoal  by remember { mutableStateOf<Goal?>(null) }
+
+    // Coach marks state
+    var showSurplusCoach by remember { mutableStateOf(false) }
+    var showPaceCoach by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(1000)
+        showSurplusCoach = true
+        delay(2000)
+        if (goals.isNotEmpty()) showPaceCoach = true
+    }
 
     // ── DERIVED STATS ─────────────────────────────────────────────────────
     val totalTargeted  = goals.sumOf { it.targetAmount }
@@ -128,28 +140,41 @@ fun GoalTrackerScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // ── MONTHLY SURPLUS PILL ──────────────────────────────────────────
+        // ── FREE CASH PILL ───────────────────────────────────────────────
         if (monthlySurplus > 0) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(SharkNavy.copy(alpha = 0.08f))
-                    .border(1.dp, SharkNavy.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.AutoMirrored.Filled.TrendingUp, null, tint = SharkNavy, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        "You have \$${String.format("%.0f", monthlySurplus)}/mo available to save",
-                        color = SharkNavy,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(SharkNavy.copy(alpha = 0.08f))
+                        .border(1.dp, SharkNavy.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.AutoMirrored.Filled.TrendingUp, null, tint = SharkNavy, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            "You have \$${String.format("%.0f", monthlySurplus)}/mo 'Free Cash' to save",
+                            color = SharkNavy,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+                
+                if (showSurplusCoach) {
+                    CoachMark(
+                        text = "This is your 'Free Cash' after bills and spending. Use it to hit goals faster!",
+                        modifier = Modifier.align(Alignment.BottomCenter).offset(y = 45.dp),
+                        onDismiss = { showSurplusCoach = false }
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(30.dp))
         }
 
         // ── GOAL CARDS ────────────────────────────────────────────────────
@@ -175,12 +200,22 @@ fun GoalTrackerScreen(
             if (activeGoals.isNotEmpty()) {
                 Text("Active", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(modifier = Modifier.height(10.dp))
-                activeGoals.forEach { goal ->
-                    GoalCard(
-                        goal           = goal,
-                        monthlySurplus = monthlySurplus,
-                        onClick        = { selectedGoal = goal }
-                    )
+                activeGoals.forEachIndexed { index, goal ->
+                    Box {
+                        GoalCard(
+                            goal           = goal,
+                            monthlySurplus = monthlySurplus,
+                            onClick        = { selectedGoal = goal }
+                        )
+                        
+                        if (showPaceCoach && index == 0) {
+                            CoachMark(
+                                text = "Shark checks if your 'Free Cash' can hit the goal by its deadline.",
+                                modifier = Modifier.align(Alignment.TopEnd).offset(x = (-20).dp, y = 30.dp),
+                                onDismiss = { showPaceCoach = false }
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(12.dp))
                 }
             }

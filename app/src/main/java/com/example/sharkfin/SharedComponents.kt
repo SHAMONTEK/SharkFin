@@ -223,6 +223,28 @@ fun FeatureTutorialOverlay(title: String, description: String, onDismiss: () -> 
 }
 
 @Composable
+fun CoachMark(
+    text: String,
+    modifier: Modifier = Modifier,
+    onDismiss: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .padding(8.dp)
+            .glassCard(cornerRadius = 12f, alpha = 0.2f)
+            .border(1.dp, SharkNavy.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+            .clickable { onDismiss() }
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("💡", fontSize = 14.sp)
+            Spacer(Modifier.width(8.dp))
+            Text(text, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
 fun MiniStat(label: String, value: String, positive: Boolean) {
     Column {
         Text(label, color = SharkMuted, fontSize = 11.sp)

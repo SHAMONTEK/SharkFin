@@ -95,7 +95,7 @@ fun HomeScreen(
 
     // ── Financials ──
     val income  = expenses.filter { it.category == "Income" || it.category == "1099 Income" || it.category == "Passive Income" }.sumOf { it.amount }
-    val spent   = expenses.filter { it.category != "Income" && it.category != "Passive Income" }.sumOf { it.amount }
+    val spent   = expenses.filter { it.category != "Income" && it.category != "1099 Income" && it.category != "Passive Income" }.sumOf { it.amount }
     val balance = income - spent
     val score   = calcMoneyScore(income, spent)
     val totalDebt = debts.sumOf { it.currentBalance }
@@ -402,10 +402,24 @@ fun HomeScreen(
     var showSpendInput  by remember { mutableStateOf(false) }
     var showSimpleGuide by remember { mutableStateOf(false) }
     var showWelcomeReminder by remember { mutableStateOf(false) }
+    
+    // Coach Marks State
+    var showMicCoach by remember { mutableStateOf(false) }
+    var showScoreCoach by remember { mutableStateOf(false) }
+    var showRunwayCoach by remember { mutableStateOf(false) }
+    var showAddCoach by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         delay(1000)
         showWelcomeReminder = true
+        delay(2000)
+        showMicCoach = true
+        delay(3000)
+        showScoreCoach = true
+        delay(4000)
+        showRunwayCoach = true
+        delay(5000)
+        showAddCoach = true
     }
 
     fun launchBubble(bubble: FloatingBubble) {
@@ -441,9 +455,20 @@ fun HomeScreen(
         ) {
             Spacer(Modifier.height(56.dp))
             
-            // 1. Freedom Clock (Runway Metric)
-            Box(modifier = Modifier.clickable { onFeatureClick?.invoke("Freedom Runway") }) {
+            // 1. Freedom Runway (Survival Metric)
+            Box(
+                modifier = Modifier.clickable { onFeatureClick?.invoke("Freedom Runway") },
+                contentAlignment = Alignment.Center
+            ) {
                 FreedomClock(runwayDays)
+                
+                if (showRunwayCoach) {
+                    CoachMark(
+                        text = "This is your 'Freedom Runway'. It shows how many days you can survive without more income.",
+                        modifier = Modifier.align(Alignment.BottomCenter).offset(y = 40.dp),
+                        onDismiss = { showRunwayCoach = false }
+                    )
+                }
             }
 
             Spacer(Modifier.height(24.dp))
@@ -461,24 +486,43 @@ fun HomeScreen(
                 if (beatingMarket && sharkMood == SharkMood.HAPPY) {
                     Text("🕶️", fontSize = 40.sp, modifier = Modifier.offset(y = (-10).dp))
                 }
+
+                if (showScoreCoach) {
+                    CoachMark(
+                        text = "This is your Money Score. Keep it green!",
+                        modifier = Modifier.align(Alignment.TopEnd).offset(x = 20.dp, y = (-20).dp),
+                        onDismiss = { showScoreCoach = false }
+                    )
+                }
+            }
+
+            // Prominent Balance Display
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("TOTAL CASH", color = SharkMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                Text(
+                    text = "$${String.format(Locale.US, "%,.2f", balance)}",
+                    color = Color.White,
+                    fontSize = 38.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
             val dailyInsight = remember(expenses, bills) { AICoachResponse.generateDailyInsight(financialState) }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
             Text(text = dailyInsight, color = SharkMuted, fontSize = 13.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(24.dp))
 
             DailyBudgetCard(firstName, accountType, incomeToday, todayRemaining, arcColor)
 
             Spacer(Modifier.height(24.dp))
 
             // 2. Passive Snowball (Income Tracker)
-            PassiveSnowballCard(passiveIncome) { onFeatureClick?.invoke("Passive Snowball") }
+            ExpandableSnowballButton(passiveIncome) { onFeatureClick?.invoke("Passive Snowball") }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
 
             // 3. Debt Vanish (Trajectory Engine)
-            DebtVanishCard(totalDebt) { onFeatureClick?.invoke("Debt Vanish") }
+            ExpandableDebtButton(totalDebt, debts) { onFeatureClick?.invoke("Debt Vanish") }
 
             Spacer(Modifier.height(32.dp))
 
@@ -516,27 +560,50 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            ControlButton(Icons.Default.Add, SharkGreen, "Income") { showIncomeInput = true }
+                            Box {
+                                ControlButton(Icons.Default.Add, SharkGreen, "Income") { showIncomeInput = true }
+                                if (showAddCoach) {
+                                    CoachMark(
+                                        text = "Add income manually here",
+                                        modifier = Modifier.align(Alignment.TopStart).offset(x = (-10).dp, y = (-50).dp),
+                                        onDismiss = { showAddCoach = false }
+                                    )
+                                }
+                            }
                         }
 
                         // Mic Button
                         val micScale by animateFloatAsState(targetValue = if (isListening) 1.3f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy))
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(
-                                modifier = Modifier.size(64.dp).scale(micScale).clip(CircleShape).background(if (isListening) SharkNavy else Color(0xFF111111)).border(2.dp, if (isListening) SharkNavy.copy(alpha = 0.5f) else Color(0xFF2A2A2A), CircleShape)
-                                    .pointerInput(Unit) {
-                                        detectTapGestures(
-                                            onDoubleTap = { inputMode = InputMode.Text },
-                                            onPress = {
-                                                startListening()
-                                                tryAwaitRelease()
-                                                if (isListening) { speechRecognizer.stopListening(); isListening = false; haptic.performHapticFeedback(HapticFeedbackType.LongPress) }
-                                            }
-                                        )
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(if (isListening) Icons.Default.MicNone else Icons.Default.Mic, null, tint = if (isListening) Color.Black else SharkNavy, modifier = Modifier.size(28.dp))
+                            Box(contentAlignment = Alignment.Center) {
+                                Box(
+                                    modifier = Modifier.size(64.dp).scale(micScale).clip(CircleShape).background(if (isListening) SharkNavy else Color(0xFF111111)).border(2.dp, if (isListening) SharkNavy.copy(alpha = 0.5f) else Color(0xFF2A2A2A), CircleShape)
+                                        .pointerInput(Unit) {
+                                            detectTapGestures(
+                                                onDoubleTap = { inputMode = InputMode.Text },
+                                                onPress = {
+                                                    startListening()
+                                                    tryAwaitRelease()
+                                                    if (isListening) {
+                                                        speechRecognizer.stopListening(); isListening = false; haptic.performHapticFeedback(
+                                                        HapticFeedbackType.LongPress
+                                                    )
+                                                    }
+                                                }
+                                            )
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(if (isListening) Icons.Default.MicNone else Icons.Default.Mic, null, tint = if (isListening) Color.Black else SharkNavy, modifier = Modifier.size(28.dp))
+                                }
+
+                                if (showMicCoach) {
+                                    CoachMark(
+                                        text = "Hold to talk to Shark",
+                                        modifier = Modifier.align(Alignment.TopCenter).offset(y = (-60).dp),
+                                        onDismiss = { showMicCoach = false }
+                                    )
+                                }
                             }
                             Spacer(Modifier.height(8.dp))
                             Text(if (isListening) "HOLDING" else "SHARK", color = if (isListening) SharkNavy else SharkMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -708,129 +775,153 @@ fun FreedomClock(days: Int) {
 }
 
 @Composable
-fun PassiveSnowballCard(amount: Double, onClick: () -> Unit) {
+fun ExpandableSnowballButton(amount: Double, onClick: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
     var projectionAmount by remember { mutableStateOf(amount.toFloat()) }
-    
+
     val level = when {
         projectionAmount >= 100 -> 3
         projectionAmount >= 50  -> 2
         projectionAmount >= 10  -> 1
         else -> 0
     }
-    
+
     val rewardText = when {
-        projectionAmount >= 500 -> "You are officially financially independent. 🏆"
-        projectionAmount >= 100 -> "Dividends pay for your car insurance & more."
-        projectionAmount >= 50  -> "Dividends now cover your monthly phone bill."
-        projectionAmount >= 10  -> "Your dividends now pay for Netflix."
-        else -> "Build your snowball to cover monthly bills."
+        projectionAmount >= 500 -> "You are financially independent. 🏆"
+        projectionAmount >= 100 -> "Dividends pay for car insurance & more."
+        projectionAmount >= 50  -> "Dividends cover your phone bill."
+        projectionAmount >= 10  -> "Your dividends pay for Netflix."
+        else -> "Build your snowball to cover bills."
     }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .glassCard(cornerRadius = 24f, alpha = 0.08f)
-            .clickable { onClick() }
-            .padding(20.dp)
+            .animateContentSize()
+            .clickable { expanded = !expanded }
+            .padding(16.dp)
     ) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(60.dp)) {
-                    val sizeScale = 0.5f + (level * 0.2f)
-                    val infiniteTransition = rememberInfiniteTransition()
-                    val rotation by infiniteTransition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec = infiniteRepeatable(tween(10000, easing = LinearEasing))
-                    )
-                    
-                    Box(modifier = Modifier
-                        .size((50 * sizeScale).dp)
-                        .background(Color.White.copy(alpha = 0.1f), CircleShape)
-                        .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
-                    )
-                    Text("❄️", fontSize = (24 * sizeScale).sp, modifier = Modifier.scale(if (projectionAmount > amount.toFloat()) 1.1f else 1.0f))
-                }
-                Spacer(Modifier.width(20.dp))
-                Column {
+                Text("❄️", fontSize = 24.sp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
                     Text("PASSIVE SNOWBALL", color = SharkMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                    Text("$${String.format(Locale.US, "%.2f", projectionAmount)}", color = if (projectionAmount > amount) SharkGreen else Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    Text(rewardText, color = SharkGreen, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    Text("$${String.format(Locale.US, "%.2f", amount)}", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 }
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    null,
+                    tint = SharkMuted
+                )
             }
-            Spacer(Modifier.height(16.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("FREEDOM CALCULATOR", color = SharkMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                if (projectionAmount != amount.toFloat()) {
-                    Text("PROJECTION", color = SharkNavy, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+
+            if (expanded) {
+                Spacer(Modifier.height(16.dp))
+                Text(rewardText, color = SharkGreen, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("PROJECTION", color = SharkMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Text("$${String.format(Locale.US, "%.0f", projectionAmount)}", color = SharkNavy, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                 }
-            }
-            Slider(
-                value = projectionAmount,
-                onValueChange = { projectionAmount = it },
-                valueRange = 0f..500f,
-                colors = SliderDefaults.colors(
-                    thumbColor = SharkNavy,
-                    activeTrackColor = SharkNavy,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.1f)
+                Slider(
+                    value = projectionAmount,
+                    onValueChange = { projectionAmount = it },
+                    valueRange = 0f..500f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = SharkNavy,
+                        activeTrackColor = SharkNavy,
+                        inactiveTrackColor = Color.White.copy(alpha = 0.1f)
+                    )
                 )
-            )
-            if (projectionAmount != amount.toFloat()) {
-                Text(
-                    "Tap to set this as a goal",
-                    color = SharkMuted,
-                    fontSize = 10.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Button(
+                    onClick = onClick,
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = SharkNavy.copy(alpha = 0.1f)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Open Snowball Lab", color = SharkNavy, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
 }
 
 @Composable
-fun DebtVanishCard(totalDebt: Double, onClick: () -> Unit) {
-    val initialDebt = 10000.0 // Simulated initial debt
-    val progress = (1.0 - (totalDebt / initialDebt)).coerceIn(0.0, 1.0).toFloat()
-    val animatedProgress by animateFloatAsState(targetValue = progress, animationSpec = tween(1500, easing = EaseOutCubic))
+fun ExpandableDebtButton(totalDebt: Double, debts: List<Debt>, onClick: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .glassCard(cornerRadius = 24f, alpha = 0.08f)
-            .clickable { onClick() }
-            .padding(20.dp)
+            .animateContentSize()
+            .clickable { expanded = !expanded }
+            .padding(16.dp)
     ) {
         Column {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("🌊", fontSize = 24.sp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
                     Text("DEBT VANISH", color = SharkMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                    Text("$${String.format(Locale.US, "%,.0f", totalDebt)}", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text("$${String.format(Locale.US, "%,.0f", totalDebt)}", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 }
-                Box(contentAlignment = Alignment.Center) {
-                    val infiniteTransition = rememberInfiniteTransition()
-                    val pulse by infiniteTransition.animateFloat(
-                        initialValue = 1f,
-                        targetValue = 1.2f,
-                        animationSpec = infiniteRepeatable(tween(2000), RepeatMode.Reverse)
-                    )
-                    Icon(
-                        Icons.Default.Waves, 
-                        null, 
-                        tint = SharkRed, 
-                        modifier = Modifier.size(32.dp).scale(pulse)
-                    )
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    null,
+                    tint = SharkMuted
+                )
+            }
+
+            if (expanded) {
+                Spacer(Modifier.height(16.dp))
+                if (debts.isEmpty()) {
+                    Text("No debts logged. You're free!", color = SharkGreen, fontSize = 13.sp)
+                } else {
+                    debts.forEach { debt ->
+                        DebtMeterRow(debt)
+                        Spacer(Modifier.height(12.dp))
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = onClick,
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = SharkRed.copy(alpha = 0.1f)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Trajectory Engine", color = SharkRed, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
-            Spacer(Modifier.height(16.dp))
-            Box(modifier = Modifier.fillMaxWidth().height(12.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.05f))) {
-                Box(modifier = Modifier.fillMaxHeight().fillMaxWidth(animatedProgress).background(Brush.horizontalGradient(listOf(SharkRed, SharkAmber)), CircleShape))
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Trajectory: Paid in full by Dec 2025", color = SharkMuted, fontSize = 11.sp)
-                Text("View Breakdown →", color = SharkRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            }
+        }
+    }
+}
+
+@Composable
+fun DebtMeterRow(debt: Debt) {
+    val progress = (debt.currentBalance / debt.totalAmount).coerceIn(0.0, 1.0).toFloat()
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(debt.name, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text("$${String.format(Locale.US, "%,.0f", debt.currentBalance)} left", color = SharkMuted, fontSize = 11.sp)
+        }
+        // Vertical Meter
+        Box(
+            modifier = Modifier
+                .width(12.dp)
+                .height(40.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color.White.copy(alpha = 0.05f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(progress)
+                    .align(Alignment.BottomCenter)
+                    .background(SharkRed, RoundedCornerShape(4.dp))
+            )
         }
     }
 }
@@ -934,7 +1025,7 @@ private fun DailyBudgetCard(firstName: String, accountType: String, dailyBudget:
                     Text(firstName.uppercase(), color = SharkMuted, fontSize = 10.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
                     Text(accountType, color = SharkMuted.copy(alpha = 0.7f), fontSize = 9.sp)
                 }
-                Text("DAILY BUDGET", color = SharkMuted, fontSize = 10.sp, letterSpacing = 2.sp)
+                Text("DAILY SPENDING LIMIT", color = SharkMuted, fontSize = 10.sp, letterSpacing = 2.sp)
             }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.Bottom) {

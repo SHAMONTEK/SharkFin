@@ -257,9 +257,9 @@ object AICoachNLP {
         val intent = when {
             isCorrection -> TransactionIntent.CORRECTION
             isHustle     -> TransactionIntent.HUSTLE_INCOME
+            isIncome     -> TransactionIntent.INCOME
             isDebt       -> TransactionIntent.DEBT_PAYMENT
             recurringKey != null && isExpense -> TransactionIntent.RECURRING_EXPENSE
-            isIncome     -> TransactionIntent.INCOME
             isExpense    -> TransactionIntent.EXPENSE
             amt != null  -> TransactionIntent.EXPENSE
             else         -> TransactionIntent.UNCLEAR

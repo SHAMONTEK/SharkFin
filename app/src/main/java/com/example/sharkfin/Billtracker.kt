@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
@@ -108,6 +109,17 @@ fun BillTrackerScreen(
     val today = remember { Calendar.getInstance() }
     var viewMonth by remember { mutableIntStateOf(today.get(Calendar.MONTH)) }
     var viewYear by remember { mutableIntStateOf(today.get(Calendar.YEAR)) }
+    
+    // Coach marks state
+    var showProjectedCoach by remember { mutableStateOf(false) }
+    var showPayCoach by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(800)
+        showProjectedCoach = true
+        delay(2000)
+        if (bills.isNotEmpty()) showPayCoach = true
+    }
 
     Column(
         modifier = Modifier
@@ -162,6 +174,14 @@ fun BillTrackerScreen(
                     Text("${unpaidBills.size} pending", color = SharkMuted, fontSize = 11.sp)
                 }
             }
+
+            if (showProjectedCoach) {
+                CoachMark(
+                    text = "Shark predicts your balance after all bills are paid.",
+                    modifier = Modifier.align(Alignment.BottomStart).offset(y = 50.dp),
+                    onDismiss = { showProjectedCoach = false }
+                )
+            }
         }
 
         Spacer(Modifier.height(32.dp))
@@ -189,12 +209,22 @@ fun BillTrackerScreen(
         ) {
             val sortedBills = bills.sortedWith(compareBy({ it.isPaid }, { it.dayOfMonth }))
             items(sortedBills) { bill ->
-                BillRowItem(
-                    bill = bill, 
-                    uid = uid, 
-                    db = db,
-                    onClick = { selectedBill = bill }
-                )
+                Box {
+                    BillRowItem(
+                        bill = bill,
+                        uid = uid,
+                        db = db,
+                        onClick = { selectedBill = bill }
+                    )
+                    
+                    if (showPayCoach && !bill.isPaid && sortedBills.indexOf(bill) == 0) {
+                        CoachMark(
+                            text = "Tap 'PAY' to log a payment and update your cash.",
+                            modifier = Modifier.align(Alignment.CenterEnd).offset(x = (-60).dp, y = 30.dp),
+                            onDismiss = { showPayCoach = false }
+                        )
+                    }
+                }
             }
             
             if (bills.isEmpty()) {
@@ -259,9 +289,22 @@ fun BillRowItem(bill: Bill, uid: String, db: FirebaseFirestore, onClick: () -> U
                     .background(if (bill.isPaid) SharkGreen.copy(alpha = 0.1f) else SharkAmber.copy(alpha = 0.1f))
                     .clickable {
                         scope.launch {
+                            val nextPaid = !bill.isPaid
                             db.collection("users").document(uid)
                                 .collection("bills").document(bill.id)
-                                .update("isPaid", !bill.isPaid)
+                                .update("isPaid", nextPaid)
+                            
+                            if (nextPaid) {
+                                // Log as expense to update balance
+                                val expenseData = hashMapOf(
+                                    "title" to bill.name,
+                                    "amount" to bill.amount,
+                                    "category" to bill.category,
+                                    "note" to "Bill payment",
+                                    "createdAt" to java.util.Date()
+                                )
+                                db.collection("users").document(uid).collection("expenses").add(expenseData)
+                            }
                         }
                     }
                     .padding(horizontal = 8.dp, vertical = 2.dp)
@@ -443,9 +486,21 @@ fun markBillPaidByKey(
     }
 
     matchedBill?.let { bill ->
-        db.collection("users").document(uid)
-            .collection("bills")
-            .document(bill.id)
-            .update("isPaid", true)
+        if (!bill.isPaid) {
+            db.collection("users").document(uid)
+                .collection("bills")
+                .document(bill.id)
+                .update("isPaid", true)
+
+            // Log as expense to update balance
+            val expenseData = hashMapOf(
+                "title" to bill.name,
+                "amount" to bill.amount,
+                "category" to bill.category,
+                "note" to "Paid via Shark command",
+                "createdAt" to java.util.Date()
+            )
+            db.collection("users").document(uid).collection("expenses").add(expenseData)
+        }
     }
 }

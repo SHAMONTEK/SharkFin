@@ -53,6 +53,38 @@ fun AccountSettingsScreen() {
                 db.collection("users").document(uid).update("emailReports", it)
             }
 
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text("Education & Tips", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Button(
+                onClick = {
+                    db.collection("users").document(uid).update("onboarded", false)
+                },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.05f)),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Text("Replay Onboarding Tour", color = Color.White)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = {
+                    // Logic to reset specific screen tutorials
+                    // This assumes screens use local state or a "show_tutorial_flag"
+                    // For now, let's reset a global flag that screens could listen to
+                    db.collection("users").document(uid).update("reset_tutorials_trigger", System.currentTimeMillis())
+                },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.05f)),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Text("Reset All In-App Coach Marks", color = Color.White)
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
             Text("Danger Zone", color = Color(0xFFef4444), fontSize = 14.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(12.dp))

@@ -149,7 +149,7 @@ object AICoachResponse {
             append("\$${fmt(amount)} logged. ")
             append("I've set aside \$${fmt(tax)} (20%) for taxes. ")
             if (runwayExtended > 0) {
-                append("This just extended your Freedom Clock by $runwayExtended day${if (runwayExtended == 1) "" else "s"}. ")
+                append("This just extended your Freedom Runway by $runwayExtended day${if (runwayExtended == 1) "" else "s"}. ")
             }
             append("Keep that momentum.")
         }
@@ -201,7 +201,7 @@ object AICoachResponse {
 
         val dailyUpdateMsg = if (state.paydayInDays != null && state.paydayInDays > 0) {
             val newDaily = (newBal * (state.goalPercent / 100.0)) / state.paydayInDays
-            " New daily budget: \$${String.format("%.2f", newDaily)}."
+            " New daily spending limit: \$${String.format("%.2f", newDaily)}."
         } else ""
 
         val message = buildString {
@@ -209,9 +209,9 @@ object AICoachResponse {
             if (source.isNotEmpty()) append(" $source")
             append(". ")
             if (isDividend) {
-                append("Your Passive Snowball is growing. ")
+                append("Your Passive Cash is growing. ")
             }
-            append("Balance: \$${fmt(newBal)}.")
+            append("Total Cash: \$${fmt(newBal)}.")
             if (dailyUpdateMsg.isNotEmpty()) append(dailyUpdateMsg)
             append(motivate(mood, state.currentStreak))
         }
@@ -280,9 +280,9 @@ object AICoachResponse {
             append("\$${fmt(amount)} logged$merchant.")
             append(tipMsg)
             if (wentOver) {
-                append(" You're \$${fmt(Math.abs(leftToday))} over your limit today.")
+                append(" You're \$${fmt(Math.abs(leftToday))} over your spending limit for today.")
             } else {
-                append(" \$${fmt(leftToday)} left today.")
+                append(" \$${fmt(leftToday)} left to spend today.")
             }
             append(streakMsg)
             if (isHungry) {
@@ -326,7 +326,7 @@ object AICoachResponse {
         } else ""
 
         val message = "\$${fmt(amount)} for $billName. Done.$amountDiffMsg " +
-                "Balance now: \$${fmt(newBal)}."
+                "Total cash: \$${fmt(newBal)}."
 
         return SharkResponse(
             message        = message,
@@ -411,7 +411,7 @@ object AICoachResponse {
         val message = when {
             newAmount == 0.0 ->
                 "Rent is zero for now? That's a major W. Updating to \$0. " +
-                        "Your daily budget just got a lot healthier."
+                        "Your daily spending limit just got a lot healthier."
             newAmount < oldRent ->
                 "Rent dropped from \$${fmt(oldRent)} to \$${fmt(newAmount)}. " +
                         "That's \$${fmt(oldRent - newAmount)} back in your pocket every month. Updated."
@@ -540,8 +540,10 @@ object AICoachResponse {
         val isPayday  = state.paydayInDays == 0
         val streak    = state.currentStreak
 
+        val balancePrefix = "Total Cash: \$${fmt(state.balance)}. "
+
         // Priority order — most urgent first
-        return when {
+        return balancePrefix + when {
 
             // Payday
             isPayday ->
@@ -555,11 +557,11 @@ object AICoachResponse {
 
             // Over budget
             state.dailySpentSoFar > state.dailyBudget ->
-                "Already over for today. Tomorrow starts fresh."
+                "Already over your limit for today. Tomorrow starts fresh."
 
             // Almost at limit
             state.dailyBudget - state.dailySpentSoFar < 5 && state.dailyBudget > 0 ->
-                "Almost tapped out for today. \$${fmt(state.dailyBudget - state.dailySpentSoFar)} left."
+                "Almost reached your limit for today. \$${fmt(state.dailyBudget - state.dailySpentSoFar)} left."
 
             // Strong streak
             streak >= 30 ->
@@ -574,11 +576,11 @@ object AICoachResponse {
 
             // Monday motivation
             isMonday ->
-                "New week. \$${fmt(state.dailyBudget)} to work with today. Let's go."
+                "New week. \$${fmt(state.dailyBudget)} to spend today. Let's go."
 
             // Low balance warning
             state.balance < 50 ->
-                "Balance is low — \$${fmt(state.balance)}. Move careful today."
+                "Cash is low — \$${fmt(state.balance)}. Move careful today."
 
             // Goal progress
             state.goalPercent >= 75 ->

@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import java.util.*
 
 @Composable
@@ -34,6 +35,17 @@ fun VisualModelsScreen(
 ) {
     var showTutorial by remember { mutableStateOf(true) }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
+
+    // Coach marks state
+    var showBenchmarkCoach by remember { mutableStateOf(false) }
+    var showDonutCoach by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(1200)
+        showBenchmarkCoach = true
+        delay(2500)
+        showDonutCoach = true
+    }
 
     // ── DATA PREP ──────────────────────────────────────────────────────────
     val totalIncome = expenses.filter { it.category == "Income" || it.category == "1099 Income" || it.category == "Passive Income" }.sumOf { it.amount }
@@ -58,9 +70,19 @@ fun VisualModelsScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // ── 1. Benchmark Battle (Student vs S&P 500) ─────────────────────
-            BenchmarkBattleCard(totalIncome, netBalance)
+            Box {
+                BenchmarkBattleCard(totalIncome, netBalance)
+                
+                if (showBenchmarkCoach) {
+                    CoachMark(
+                        text = "We compare your savings rate to the stock market's growth.",
+                        modifier = Modifier.align(Alignment.BottomCenter).offset(y = 40.dp),
+                        onDismiss = { showBenchmarkCoach = false }
+                    )
+                }
+            }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(35.dp))
 
             // ── 2. HEALTH SCORE ──────────────────────────────────────────────
             HealthScoreCard(expenses, bills, goals)
@@ -70,7 +92,17 @@ fun VisualModelsScreen(
             // ── 3. DONUT WITH DRILL-DOWN ──────────────────────────────────────
             Text("Spending Distribution", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(16.dp))
-            DonutChartWithDrilldown(expenses, selectedCategory) { selectedCategory = it }
+            Box {
+                DonutChartWithDrilldown(expenses, selectedCategory) { selectedCategory = it }
+                
+                if (showDonutCoach) {
+                    CoachMark(
+                        text = "Tap categories to see where your money is actually going.",
+                        modifier = Modifier.align(Alignment.CenterEnd).offset(x = (-20).dp, y = 30.dp),
+                        onDismiss = { showDonutCoach = false }
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
 

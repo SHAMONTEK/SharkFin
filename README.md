@@ -303,11 +303,11 @@ Every screen is **read-only from state**. All writes go directly to Firestore an
 - [x] Tax estimator
 - [x] Inflation calculator
 - [x] Persistent auth (no re-login)
-- [ ] AI Coach — natural language → auto-updates
-- [ ] Biometric lock
-- [ ] Push notifications for bill due dates
-- [ ] CSV export
-- [ ] Shared accounts / invite system
+- [x] AI Coach — natural language → auto-updates
+- [x] Biometric lock
+- [x] Push notifications for bill due dates
+- [x] CSV export
+- [x] Shared accounts / invite system
 
 ---
 

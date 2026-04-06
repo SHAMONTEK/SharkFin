@@ -54,7 +54,7 @@ fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
             icon        = Icons.Default.AccountBalanceWallet,
             color       = SharkGreen,
             available   = true,
-            description = "Log income & spending in real time",
+            description = "Keep track of every dollar you spend",
             tag         = ""
         ),
         SharkFeature(
@@ -62,7 +62,7 @@ fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
             icon        = Icons.Default.FileUpload,
             color       = SharkGreen,
             available   = true,
-            description = "Bulk add expenses from bank CSV",
+            description = "Import your bank activity for a fast start",
             tag         = "NEW"
         ),
         SharkFeature(
@@ -70,7 +70,7 @@ fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
             icon        = Icons.Default.Receipt,
             color       = Color(0xFFf59e0b),
             available   = true,
-            description = "Calendar view with 2-week reminders",
+            description = "Never miss a payment with smart reminders",
             tag         = ""
         ),
         SharkFeature(
@@ -78,7 +78,7 @@ fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
             icon        = Icons.Default.Flag,
             color       = Color(0xFF06b6d4),
             available   = true,
-            description = "Set targets, track pace, hit deadlines",
+            description = "Plan for big wins and track your pace",
             tag         = ""
         ),
         SharkFeature(
@@ -86,7 +86,7 @@ fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
             icon        = Icons.Default.BarChart,
             color       = Color(0xFF8b5cf6),
             available   = true,
-            description = "Donut, trend line & comparison charts",
+            description = "Visual maps of your spending and savings",
             tag         = ""
         ),
         SharkFeature(
@@ -94,7 +94,7 @@ fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
             icon        = Icons.Default.Description,
             color       = Color(0xFFef4444),
             available   = true,
-            description = "2024 brackets, effective rate estimator",
+            description = "Simple estimate of what you'll owe in 2024",
             tag         = "BETA"
         ),
         SharkFeature(
@@ -102,7 +102,7 @@ fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
             icon        = Icons.Default.Calculate,
             color       = Color(0xFF06b6d4),
             available   = true,
-            description = "See how your money loses value over time",
+            description = "See how your money's power changes over time",
             tag         = "BETA"
         ),
         SharkFeature(
@@ -110,7 +110,7 @@ fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
             icon        = Icons.Default.Payments,
             color       = SharkNavy,
             available   = true,
-            description = "Track payouts, yields & ex-dividend dates",
+            description = "Track your investment income and payouts",
             tag         = "NEW"
         ),
         SharkFeature(
@@ -118,7 +118,7 @@ fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
             icon        = Icons.Default.CurrencyExchange,
             color       = SharkGreen,
             available   = true,
-            description = "Live market terminal with benchmark mode",
+            description = "Check stocks and battle against the market",
             tag         = "UPDATED"
         ),
         SharkFeature(
@@ -126,7 +126,7 @@ fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
             icon        = Icons.Default.Settings,
             color       = Color(0xFF6b7280),
             available   = true,
-            description = "Security, notifications, preferences",
+            description = "Customize your app and keep data safe",
             tag         = ""
         ),
         SharkFeature(
@@ -134,7 +134,7 @@ fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
             icon        = Icons.Default.Psychology,
             color       = Color(0xFF8b5cf6),
             available   = false,
-            description = "Talk to SharkFin — it updates everything",
+            description = "Ask questions and log things by talking",
             tag         = "SOON"
         ),
         SharkFeature(
@@ -142,7 +142,7 @@ fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
             icon        = Icons.Default.TrendingUp,
             color       = SharkGreen,
             available   = false,
-            description = "Portfolio tracking & growth modeling",
+            description = "See how your investments grow over time",
             tag         = "SOON"
         ),
         SharkFeature(
@@ -150,7 +150,7 @@ fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
             icon        = Icons.Default.AutoGraph,
             color       = Color(0xFFec4899),
             available   = false,
-            description = "Forecast your balance 6 months out",
+            description = "Peek into the future of your bank balance",
             tag         = "SOON"
         ),
         SharkFeature(
@@ -158,7 +158,7 @@ fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
             icon        = Icons.Default.People,
             color       = Color(0xFFf59e0b),
             available   = false,
-            description = "Joint & family account collaboration",
+            description = "Manage money together with family",
             tag         = "SOON"
         )
     )
@@ -241,22 +241,6 @@ fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
                 }
             }
             Spacer(Modifier.height(12.dp))
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        Text(
-            "IN DEVELOPMENT",
-            color         = SharkMuted,
-            fontSize      = 11.sp,
-            fontWeight    = FontWeight.Bold,
-            letterSpacing = 2.sp
-        )
-        Spacer(Modifier.height(12.dp))
-
-        comingSoon.forEach { feature ->
-            ComingSoonRow(feature = feature)
-            Spacer(Modifier.height(8.dp))
         }
 
         Spacer(Modifier.height(100.dp))
