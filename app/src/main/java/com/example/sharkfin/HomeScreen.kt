@@ -318,16 +318,16 @@ fun HomeScreen(
     }
 
     fun startListening() {
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            Toast.makeText(context, "Voice recognition not supported on this emulator.", Toast.LENGTH_LONG).show()
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             return
         }
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            isListening = true
-            speechRecognizer.startListening(recognizerIntent)
-        } else {
-            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+            Toast.makeText(context, "Voice recognition not available on this device.", Toast.LENGTH_LONG).show()
+            return
         }
+        isListening = true
+        speechRecognizer.startListening(recognizerIntent)
     }
 
     // ── Streak ──
