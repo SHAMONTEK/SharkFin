@@ -31,7 +31,8 @@ import java.util.*
 fun VisualModelsScreen(
     expenses: List<Expense>,
     bills: List<Bill>,
-    goals: List<Goal>
+    goals: List<Goal>,
+    discoveryData: Map<String, Any>? = null
 ) {
     var showTutorial by remember { mutableStateOf(true) }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
@@ -48,15 +49,18 @@ fun VisualModelsScreen(
     }
 
     // ── DATA PREP ──────────────────────────────────────────────────────────
-    val totalIncome = expenses.filter { it.category == "Income" || it.category == "1099 Income" || it.category == "Passive Income" }.sumOf { it.amount }
-    val totalSpending = expenses.filter { it.category != "Income" && it.category != "Passive Income" }.sumOf { it.amount }
-    val totalBills = bills.sumOf { it.amount }
+    val wizardIncome = (discoveryData?.get("monthlyIncome") as? Double) ?: 0.0
+    val wizardObligations = (discoveryData?.get("monthlyObligations") as? Double) ?: 0.0
+    
+    val totalIncome = expenses.filter { SharkIncomeCategories.contains(it.category) }.sumOf { it.amount }.coerceAtLeast(wizardIncome)
+    val totalSpending = expenses.filter { !SharkIncomeCategories.contains(it.category) }.sumOf { it.amount }
+    val totalBills = bills.sumOf { it.amount }.coerceAtLeast(wizardObligations)
 
     val taxableIncome = (totalIncome - 12000.0).coerceAtLeast(0.0) // simplified deduction
     val estimatedTax = calculateEstimatedTax(taxableIncome)
     val netBalance = totalIncome - totalSpending - estimatedTax
 
-    Box(modifier = Modifier.fillMaxSize().background(SharkBlack)) {
+    Box(modifier = Modifier.fillMaxSize().background(SharkBg)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -64,14 +68,14 @@ fun VisualModelsScreen(
                 .padding(horizontal = 20.dp)
         ) {
             Spacer(modifier = Modifier.height(56.dp))
-            Text("Living Dashboard", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-            Text("Financial Survival Engine v1.0", color = SharkMuted, fontSize = 13.sp)
+            Text("Living Dashboard", color = SharkWhite, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text("Financial Survival Engine v1.0", color = SharkSecondary, fontSize = 13.sp)
 
             Spacer(modifier = Modifier.height(24.dp))
 
             // ── 1. Benchmark Battle (Student vs S&P 500) ─────────────────────
             Box {
-                BenchmarkBattleCard(totalIncome, netBalance)
+                BenchmarkBattleCard(expenses, totalIncome, netBalance)
                 
                 if (showBenchmarkCoach) {
                     CoachMark(
@@ -125,46 +129,54 @@ fun VisualModelsScreen(
 }
 
 @Composable
-fun BenchmarkBattleCard(income: Double, net: Double) {
+fun BenchmarkBattleCard(expenses: List<Expense>, income: Double, net: Double) {
     val userGrowth = if (income > 0) (net / income) * 100 else 0.0
     val sp500Growth = 8.5 // Simulated YTD S&P 500
     
-    Box(modifier = Modifier.fillMaxWidth().glassCard(alpha = 0.1f).padding(20.dp)) {
+    // Generate trend points based on real data, otherwise show a flat line
+    val userPoints = remember(expenses) {
+        if (expenses.size < 2) listOf(0.5f, 0.5f, 0.5f, 0.5f, 0.5f)
+        else {
+            // Sort by date and map to 0f-1f range based on amount
+            val sorted = expenses.takeLast(10).reversed()
+            val max = sorted.maxOf { it.amount }.coerceAtLeast(1.0)
+            sorted.map { (it.amount / max).toFloat().coerceIn(0.1f, 1.0f) }
+        }
+    }
+    
+    Box(modifier = Modifier.fillMaxWidth().glassCard(alpha = 1.0f).padding(20.dp)) {
         Column {
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                Text("BENCHMARK BATTLE", color = SharkMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text("BENCHMARK BATTLE", color = SharkSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                 if (userGrowth > sp500Growth) {
-                    Text("BEATING THE WHALES 🐋", color = SharkGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("BEATING THE WHALES 🐋", color = SharkGold, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
             Spacer(Modifier.height(16.dp))
             
             Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(24.dp)) {
                 Column {
-                    Text("YOU", color = SharkNavy, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Text("${String.format(Locale.US, "%.1f", userGrowth)}%", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Text("YOU", color = SharkGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("${String.format(Locale.US, "%.1f", userGrowth)}%", color = SharkWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 }
                 Column {
-                    Text("S&P 500", color = SharkMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Text("${sp500Growth}%", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Text("S&P 500", color = SharkSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("${sp500Growth}%", color = SharkWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 }
             }
             
             Spacer(Modifier.height(24.dp))
             
-            // High-performance Custom Chart (Instead of Vico for now to avoid dependency sync issues)
             Box(modifier = Modifier.height(120.dp).fillMaxWidth()) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val userPoints = listOf(0.1f, 0.2f, 0.4f, 0.3f, 0.7f, 1.0f)
                     val spPoints = listOf(0.2f, 0.3f, 0.35f, 0.5f, 0.6f, 0.8f)
-                    
-                    drawTrendLine(spPoints, SharkMuted.copy(alpha = 0.5f))
-                    drawTrendLine(userPoints, SharkNavy)
+                    drawTrendLine(spPoints, SharkSecondary.copy(alpha = 0.5f))
+                    drawTrendLine(userPoints, SharkGold)
                 }
             }
             
             Spacer(Modifier.height(12.dp))
-            Text("Democratizing the 'Rich Man\\'s' metric.", color = SharkMuted, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            Text("Democratizing the 'Rich Man\\'s' metric.", color = SharkSecondary, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
         }
     }
 }
@@ -183,8 +195,8 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTrendLine(points: List<
 
 @Composable
 fun HealthScoreCard(expenses: List<Expense>, bills: List<Bill>, goals: List<Goal>) {
-    val totalIncome = expenses.filter { it.category == "Income" || it.category == "1099 Income" || it.category == "Passive Income" }.sumOf { it.amount }
-    val totalSpend = expenses.filter { it.category != "Income" && it.category != "Passive Income" }.sumOf { it.amount }
+    val totalIncome = expenses.filter { SharkIncomeCategories.contains(it.category) }.sumOf { it.amount }
+    val totalSpend = expenses.filter { !SharkIncomeCategories.contains(it.category) }.sumOf { it.amount }
 
     val rawSavingsRate = if (totalIncome > 0 && totalIncome.isFinite()) ((totalIncome - totalSpend) / totalIncome) else 0.0
     val savingsRate = if (rawSavingsRate.isNaN()) 0.0 else rawSavingsRate.coerceIn(0.0, 1.0)
@@ -205,12 +217,12 @@ fun HealthScoreCard(expenses: List<Expense>, bills: List<Bill>, goals: List<Goal
 
     val score = ((savingsRate * 40) + (goalsOnPace * 40) + (billBurden * 20)).toInt().coerceIn(0, 100)
     val scoreColor = when {
-        score > 75 -> SharkGreen
-        score > 50 -> Color(0xFFf59e0b)
-        else -> Color(0xFFef4444)
+        score > 75 -> SharkGold
+        score > 50 -> SharkAmber
+        else -> SharkRed
     }
 
-    Box(modifier = Modifier.fillMaxWidth().glassCard(alpha = 0.1f).padding(24.dp)) {
+    Box(modifier = Modifier.fillMaxWidth().glassCard(alpha = 1.0f).padding(24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(80.dp)) {
                 CircularProgressIndicator(
@@ -218,20 +230,20 @@ fun HealthScoreCard(expenses: List<Expense>, bills: List<Bill>, goals: List<Goal
                     modifier = Modifier.fillMaxSize(),
                     color = scoreColor,
                     strokeWidth = 8.dp,
-                    trackColor = Color.White.copy(alpha = 0.1f)
+                    trackColor = SharkWhite.copy(alpha = 0.1f)
                 )
-                Text("$score", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text("$score", color = SharkWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             }
             Spacer(modifier = Modifier.width(24.dp))
             Column {
-                Text("Financial Health", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("Financial Health", color = SharkWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Text(
                     when {
                         score > 75 -> "Excellent. Your growth is optimized."
                         score > 50 -> "Good. Focus on reducing fixed bills."
                         else -> "Critical. High spending detected."
                     },
-                    color = SharkMuted,
+                    color = SharkSecondary,
                     fontSize = 12.sp
                 )
             }
@@ -241,11 +253,11 @@ fun HealthScoreCard(expenses: List<Expense>, bills: List<Bill>, goals: List<Goal
 
 @Composable
 fun DonutChartWithDrilldown(expenses: List<Expense>, selectedCategory: String?, onCategorySelect: (String?) -> Unit) {
-    val spendingExpenses = expenses.filter { it.category != "Income" && it.category != "Passive Income" }
+    val spendingExpenses = expenses.filter { !SharkIncomeCategories.contains(it.category) }
     val categories = spendingExpenses.groupBy { it.category }.mapValues { it.value.sumOf { e -> e.amount } }
     val total = categories.values.sum().toFloat()
 
-    Column(modifier = Modifier.fillMaxWidth().glassCard(alpha = 0.05f).padding(20.dp).animateContentSize()) {
+    Column(modifier = Modifier.fillMaxWidth().glassCard(alpha = 1.0f).padding(20.dp).animateContentSize()) {
         Box(modifier = Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
             Canvas(modifier = Modifier.size(140.dp)) {
                 var startAngle = -90f
@@ -265,14 +277,14 @@ fun DonutChartWithDrilldown(expenses: List<Expense>, selectedCategory: String?, 
             }
             if (selectedCategory != null) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(selectedCategory, color = Color.White, fontSize = 12.sp)
+                    Text(selectedCategory, color = SharkWhite, fontSize = 12.sp)
                     val amount = categories[selectedCategory] ?: 0.0
-                    Text(String.format(Locale.US, "$%.0f", amount), color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(String.format(Locale.US, "$%.0f", amount), color = SharkWhite, fontWeight = FontWeight.Bold)
                 }
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Total Spend", color = SharkMuted, fontSize = 11.sp)
-                    Text(String.format(Locale.US, "$%.0f", total), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text("Total Spend", color = SharkSecondary, fontSize = 11.sp)
+                    Text(String.format(Locale.US, "$%.0f", total), color = SharkWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -297,12 +309,12 @@ fun DonutChartWithDrilldown(expenses: List<Expense>, selectedCategory: String?, 
 fun FlowBarChart(income: Double, spending: Double, bills: Double, taxes: Double) {
     val maxVal = maxOf(income, spending + bills + taxes, 1.0)
 
-    Box(modifier = Modifier.fillMaxWidth().glassCard(alpha = 0.05f).padding(20.dp)) {
+    Box(modifier = Modifier.fillMaxWidth().glassCard(alpha = 1.0f).padding(20.dp)) {
         Row(modifier = Modifier.fillMaxWidth().height(160.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.Bottom) {
-            Bar("Income", income, maxVal, SharkGreen)
-            Bar("Spend", spending, maxVal, Color(0xFF8b5cf6))
-            Bar("Bills", bills, maxVal, Color(0xFFf59e0b))
-            Bar("Taxes", taxes, maxVal, Color(0xFFef4444))
+            Bar("Income", income, maxVal, SharkGold)
+            Bar("Spend", spending, maxVal, SharkPurple)
+            Bar("Bills", bills, maxVal, SharkAmber)
+            Bar("Taxes", taxes, maxVal, SharkRed)
         }
     }
 }
@@ -316,6 +328,6 @@ fun Bar(label: String, value: Double, max: Double, color: Color) {
         Spacer(modifier = Modifier.height(4.dp))
         Box(modifier = Modifier.width(30.dp).fillMaxHeight(heightFactor).clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)).background(color))
         Spacer(modifier = Modifier.height(8.dp))
-        Text(label, color = SharkMuted, fontSize = 10.sp)
+        Text(label, color = SharkSecondary, fontSize = 10.sp)
     }
 }

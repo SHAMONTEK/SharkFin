@@ -82,12 +82,16 @@ class WelcomeActivity : ComponentActivity() {
         setContent {
             var displayName by remember { mutableStateOf("Shark") }
             var accountType by remember { mutableStateOf("INDIVIDUAL") }
+            var discoveryData by remember { mutableStateOf<Map<String, Any>?>(null) }
 
             LaunchedEffect(firebaseUser.uid) {
                 db.collection("users").document(firebaseUser.uid).get()
                     .addOnSuccessListener { doc ->
                         displayName = doc.getString("displayName") ?: "Shark"
                         accountType = doc.getString("accountType") ?: "INDIVIDUAL"
+                        discoveryData = doc.data?.filterKeys { 
+                            it in listOf("monthlyIncome", "monthlyObligations", "targetSavings", "totalDebt", "discoveryCompleted")
+                        }
                     }
             }
 
@@ -95,6 +99,7 @@ class WelcomeActivity : ComponentActivity() {
                 uid = firebaseUser.uid,
                 displayName = displayName,
                 accountType = accountType,
+                discoveryData = discoveryData,
                 db = db,
                 onUpdateProfile = { newName -> displayName = newName },
                 onLogout = {
@@ -133,14 +138,11 @@ fun SharkFinDashboard(
     uid: String,
     displayName: String,
     accountType: String,
+    discoveryData: Map<String, Any>?,
     db: FirebaseFirestore,
     onUpdateProfile: (String) -> Unit,
     onLogout: () -> Unit
 ) {
-    val tabs = DashTab.values()
-    val pagerState = rememberPagerState(pageCount = { tabs.size })
-    val scope = rememberCoroutineScope()
-
     // ── Unified Source of Truth (Single Dashboard State) ──
     var expenses      by remember { mutableStateOf(listOf<Expense>()) }
     var bills         by remember { mutableStateOf(listOf<Bill>()) }
@@ -215,7 +217,7 @@ fun SharkFinDashboard(
                         amount   = doc.getDouble("amount")   ?: 0.0,
                         category = doc.getString("category") ?: "Other"
                     )
-                } ?: defaultRecurringBills
+                } ?: emptyList()
             }
 
         // Listen for Portfolio
@@ -246,65 +248,33 @@ fun SharkFinDashboard(
                 )
             )
     ) {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize().padding(bottom = 100.dp)
-        ) { page ->
-            when (tabs[page]) {
-                DashTab.HOME -> HomeScreen(
-                    uid              = uid,
-                    db               = db,
-                    displayName      = displayName,
-                    accountType      = accountType,
-                    expenses         = expenses,
-                    incomeSources    = incomeSources,
-                    portfolio        = portfolio,
-                    bills            = bills,
-                    goals            = goals,
-                    debts            = debts,
-                    recurringBills   = if (recurringBills.isEmpty()) defaultRecurringBills else recurringBills,
-                    onExpenseClick   = { editingExpense = it },
-                    onAddIncomeClick = { showAddIncome = true },
-                    onFeatureClick   = { openFeature = it },
-                    onAddExpense     = { showAddExpense = true }
-                )
-                DashTab.FEATURES -> FeaturesScreen(
-                    onFeatureClick = { feature ->
-                        when (feature) {
-                            "Expense Tracker" -> {
-                                scope.launch { pagerState.animateScrollToPage(DashTab.ACTIVITY.ordinal) }
-                                showAddExpense = true
-                            }
-                            else -> openFeature = feature
-                        }
+        HomeScreen(
+            uid              = uid,
+            db               = db,
+            displayName      = displayName,
+            accountType      = accountType,
+            expenses         = expenses,
+            incomeSources    = incomeSources,
+            bills            = bills,
+            goals            = goals,
+            debts            = debts,
+            recurringBills   = if (recurringBills.isEmpty()) defaultRecurringBills else recurringBills,
+            discoveryData    = discoveryData,
+            onFeatureClick   = { feature ->
+                when (feature) {
+                    "Expense Tracker" -> {
+                        openFeature = "Activity"
+                        showAddExpense = true
                     }
-                )
-                DashTab.ACTIVITY -> ActivityScreen(
-                    expenses = expenses,
-                    bills = bills,
-                    uid = uid,
-                    db = db
-                )
-                DashTab.PROFILE -> ProfileScreen(
-                    uid = uid,
-                    userEmail = "",
-                    userName = displayName,
-                    onSignOut = onLogout
-                )
+                    "Account Settings" -> {
+                        openFeature = "Profile"
+                    }
+                    else -> openFeature = feature
+                }
             }
-        }
-
-        GlassBottomNav(
-            tabs = tabs,
-            currentPage = pagerState.currentPage,
-            onTabClick = { index ->
-                openFeature = null
-                scope.launch { pagerState.animateScrollToPage(index) }
-            },
-            modifier = Modifier.align(Alignment.BottomCenter)
         )
 
-        if (pagerState.currentPage == DashTab.ACTIVITY.ordinal) {
+        if (openFeature == "Activity") {
             FloatingActionButton(
                 onClick = { showAddExpense = true },
                 modifier = Modifier
@@ -327,19 +297,21 @@ fun SharkFinDashboard(
                     )
             ) {
                 when (openFeature) {
+                    "Activity"         -> ActivityScreen(expenses, bills, uid, db)
+                    "Features"         -> FixedExpensesSettingsScreen(uid, db)
+                    "Profile"          -> ProfileScreen(uid, "", displayName, onLogout)
                     "Bill Tracker"     -> BillTrackerScreen(uid, db, expenses, bills)
                     "Goal Tracker"     -> GoalTrackerScreen(uid, db, expenses, goals)
-                    "Visual Models"    -> VisualModelsScreen(expenses, bills, goals)
+                    "Visual Models"    -> VisualModelsScreen(expenses, bills, goals, discoveryData)
                     "Import Statement" -> ImportStatementScreen(uid, db) { openFeature = null }
                     "Tax Tracker"      -> TaxTrackerScreen(expenses)
                     "Dividend Tracker" -> DividendTrackerScreen(uid, db, portfolio)
                     "Inflation Calc"   -> InflationCalcScreen()
-                    "AI Prediction"    -> AiPredictionScreen(expenses, incomeSources, bills)
+                    "AI Prediction"    -> AiPredictionScreen(expenses, incomeSources, bills, discoveryData)
                     "Stock/Forex"      -> StockForexScreen(uid, db, portfolio)
                     "Passive Snowball" -> PassiveSnowballScreen(uid, db, expenses, bills)
                     "Debt Vanish"      -> DebtVanishScreen(uid, db, debts)
-                    "Freedom Runway"   -> FreedomRunwayScreen(expenses, bills)
-                    "Profile"          -> ProfileSettingsScreen(displayName, onUpdateProfile)
+                    "Freedom Runway"   -> FreedomRunwayScreen(expenses, bills, discoveryData)
                     "Account Settings" -> AccountSettingsScreen()
                     else               -> ComingSoonPlaceholder(openFeature!!)
                 }
@@ -381,48 +353,6 @@ fun SharkFinDashboard(
     }
 }
 
-@Composable
-fun GlassBottomNav(
-    tabs: Array<DashTab>,
-    currentPage: Int,
-    onTabClick: (Int) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(modifier = modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp).navigationBarsPadding()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .glassCard(cornerRadius = 30f, alpha = 0.1f)
-                .padding(vertical = 10.dp, horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceAround
-        ) {
-            tabs.forEachIndexed { index, tab ->
-                val selected = currentPage == index
-                Column(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable { onTabClick(index) }
-                        .padding(horizontal = 14.dp, vertical = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    if (selected) {
-                        Box(Modifier.width(18.dp).height(3.dp).background(SharkNavy, RoundedCornerShape(2.dp)))
-                        Spacer(Modifier.height(4.dp))
-                    } else {
-                        Spacer(Modifier.height(7.dp))
-                    }
-                    Icon(imageVector = tab.icon, contentDescription = null, tint = if (selected) SharkNavy else SharkMuted, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        tab.label,
-                        fontSize = 10.sp,
-                        color = if (selected) SharkNavy else SharkMuted,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun ComingSoonPlaceholder(feature: String) {

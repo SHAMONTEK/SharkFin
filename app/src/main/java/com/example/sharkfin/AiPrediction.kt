@@ -26,16 +26,22 @@ import kotlin.math.sin
 fun AiPredictionScreen(
     expenses: List<Expense>,
     incomeSources: List<IncomeSource>,
-    bills: List<Bill>
+    bills: List<Bill>,
+    discoveryData: Map<String, Any>? = null
 ) {
     var selectedScenario by remember { mutableStateOf("Baseline") }
     var showInsight by remember { mutableStateOf(false) }
 
-    val totalIncome = if (incomeSources.isNotEmpty()) incomeSources.sumOf { it.amount } else expenses.filter { it.category == "Income" }.sumOf { it.amount }
-    val avgMonthlySpend = expenses.filter { it.category != "Income" }.sumOf { it.amount }.let { if (it > 0) it / 3.0 else 1200.0 } // Mock 3 month avg
-    val totalBills = bills.sumOf { it.amount }
+    val wizardIncome = (discoveryData?.get("monthlyIncome") as? Double) ?: 0.0
+    val wizardObligations = (discoveryData?.get("monthlyObligations") as? Double) ?: 0.0
 
-    Box(modifier = Modifier.fillMaxSize().background(SharkBlack)) {
+    val totalIncome = if (incomeSources.isNotEmpty()) incomeSources.sumOf { it.amount } else expenses.filter { it.category == "Income" }.sumOf { it.amount }
+    val effectiveIncome = totalIncome.coerceAtLeast(wizardIncome)
+    
+    val avgMonthlySpend = expenses.filter { it.category != "Income" }.sumOf { it.amount }.let { if (it > 0) it / 3.0 else (wizardObligations).coerceAtLeast(1200.0) } // Mock 3 month avg
+    val totalBills = bills.sumOf { it.amount }.coerceAtLeast(wizardObligations)
+
+    Box(modifier = Modifier.fillMaxSize().background(SharkBg)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -49,15 +55,15 @@ fun AiPredictionScreen(
                     modifier = Modifier
                         .size(48.dp)
                         .clip(CircleShape)
-                        .background(SharkNavy.copy(alpha = 0.15f)),
+                        .background(SharkGoldGlow),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.AutoAwesome, null, tint = SharkNavy, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Default.AutoAwesome, null, tint = SharkGold, modifier = Modifier.size(24.dp))
                 }
                 Spacer(Modifier.width(16.dp))
                 Column {
-                    Text("AI Cash Flow Oracle", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    Text("Predicting your financial destiny", color = SharkMuted, fontSize = 12.sp)
+                    Text("AI Cash Flow Oracle", color = SharkWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text("Predicting your financial destiny", color = SharkSecondary, fontSize = 12.sp)
                 }
             }
 
@@ -77,7 +83,7 @@ fun AiPredictionScreen(
             Spacer(Modifier.height(24.dp))
 
             // ── Prediction Graph ───────────────────────────────────────────
-            PredictionGraph(totalIncome, avgMonthlySpend, selectedScenario)
+            PredictionGraph(effectiveIncome, avgMonthlySpend, selectedScenario)
 
             Spacer(Modifier.height(32.dp))
 
@@ -87,12 +93,12 @@ fun AiPredictionScreen(
             Spacer(Modifier.height(32.dp))
 
             // ── Future Milestones ──────────────────────────────────────────
-            Text("Predicted Milestones", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("Predicted Milestones", color = SharkWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(16.dp))
             
-            MilestoneItem("Emergency Fund Full", "3 months from now", Icons.Default.Shield, SharkGreen)
+            MilestoneItem("Emergency Fund Full", "3 months from now", Icons.Default.Shield, SharkGold)
             MilestoneItem("Debt Free Date", "Oct 2026", Icons.Default.EventAvailable, SharkAmber)
-            MilestoneItem("Financial Independence", "14 years from now", Icons.Default.Celebration, SharkNavy)
+            MilestoneItem("Financial Independence", "14 years from now", Icons.Default.Celebration, SharkGold)
 
             Spacer(Modifier.height(120.dp))
         }
@@ -104,11 +110,12 @@ fun ScenarioChip(label: String, isSelected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(if (isSelected) SharkNavy else Color.White.copy(alpha = 0.05f))
+            .background(if (isSelected) SharkGold else SharkSurface)
+            .border(0.5.dp, SharkCardBorder, RoundedCornerShape(12.dp))
             .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
-        Text(label, color = if (isSelected) Color.Black else Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = if (isSelected) SharkBg else SharkWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -133,7 +140,7 @@ fun PredictionGraph(income: Double, spend: Double, scenario: String) {
         modifier = Modifier
             .fillMaxWidth()
             .height(200.dp)
-            .glassCard(alpha = 0.05f)
+            .glassCard(alpha = 1.0f)
             .padding(20.dp)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -148,7 +155,7 @@ fun PredictionGraph(income: Double, spend: Double, scenario: String) {
             
             drawPath(
                 path = path,
-                color = SharkNavy,
+                color = SharkGold,
                 style = Stroke(width = 6f, cap = StrokeCap.Round)
             )
             
@@ -162,14 +169,14 @@ fun PredictionGraph(income: Double, spend: Double, scenario: String) {
             drawPath(
                 path = fillPath,
                 brush = Brush.verticalGradient(
-                    colors = listOf(SharkNavy.copy(alpha = 0.2f), Color.Transparent)
+                    colors = listOf(SharkGoldGlow, Color.Transparent)
                 )
             )
         }
         
         Text(
             "12 Month Net Projection: $${String.format(java.util.Locale.US, "%.0f", points.last())}",
-            color = SharkMuted,
+            color = SharkSecondary,
             fontSize = 11.sp,
             modifier = Modifier.align(Alignment.TopEnd)
         )
@@ -188,18 +195,18 @@ fun AiInsightCard(scenario: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .glassCard(cornerRadius = 20f, alpha = 0.1f)
-            .border(1.dp, SharkNavy.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+            .glassCard(cornerRadius = 20f, alpha = 1.0f)
+            .border(1.dp, SharkGoldGlow, RoundedCornerShape(20.dp))
             .padding(20.dp)
     ) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Psychology, null, tint = SharkNavy, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.Psychology, null, tint = SharkGold, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(12.dp))
-                Text("SHARK ADVICE", color = SharkNavy, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text("SHARK ADVICE", color = SharkGold, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
             }
             Spacer(Modifier.height(12.dp))
-            Text(insight, color = Color.White, fontSize = 14.sp, lineHeight = 20.sp)
+            Text(insight, color = SharkWhite, fontSize = 14.sp, lineHeight = 20.sp)
         }
     }
 }
@@ -222,9 +229,9 @@ fun MilestoneItem(title: String, date: String, icon: androidx.compose.ui.graphic
         }
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            Text(date, color = SharkMuted, fontSize = 12.sp)
+            Text(title, color = SharkWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(date, color = SharkSecondary, fontSize = 12.sp)
         }
-        Icon(Icons.Default.ChevronRight, null, tint = SharkMuted, modifier = Modifier.size(16.dp))
+        Icon(Icons.Default.ChevronRight, null, tint = SharkSecondary, modifier = Modifier.size(16.dp))
     }
 }

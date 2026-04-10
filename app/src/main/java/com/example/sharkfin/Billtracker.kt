@@ -50,7 +50,7 @@ fun QuickBillSetupGrid(uid: String, db: FirebaseFirestore) {
     var selectedKeys by remember { mutableStateOf(setOf<String>()) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text("TAP TO ADD COMMON BILLS", color = SharkMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        Text("TAP TO ADD COMMON BILLS", color = SharkSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         Spacer(Modifier.height(12.dp))
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
@@ -62,8 +62,8 @@ fun QuickBillSetupGrid(uid: String, db: FirebaseFirestore) {
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
-                        .background(if (isSelected) SharkGreen.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.05f))
-                        .border(1.dp, if (isSelected) SharkGreen else Color.Transparent, RoundedCornerShape(12.dp))
+                        .background(if (isSelected) SharkGold.copy(alpha = 0.2f) else SharkSurface)
+                        .border(1.dp, if (isSelected) SharkGold else SharkCardBorder, RoundedCornerShape(12.dp))
                         .clickable {
                             if (isSelected) {
                                 selectedKeys = selectedKeys - bill.key
@@ -84,9 +84,9 @@ fun QuickBillSetupGrid(uid: String, db: FirebaseFirestore) {
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (isSelected) Icon(Icons.Default.Check, null, tint = SharkGreen, modifier = Modifier.size(14.dp))
+                        if (isSelected) Icon(Icons.Default.Check, null, tint = SharkGold, modifier = Modifier.size(14.dp))
                         if (isSelected) Spacer(Modifier.width(4.dp))
-                        Text(bill.label, color = if (isSelected) SharkGreen else Color.White, fontSize = 12.sp)
+                        Text(bill.label, color = if (isSelected) SharkGold else SharkLabel, fontSize = 12.sp)
                     }
                 }
             }
@@ -124,7 +124,7 @@ fun BillTrackerScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(SharkBase)
+            .background(SharkBg)
             .padding(horizontal = 20.dp)
     ) {
         Spacer(Modifier.height(56.dp))
@@ -134,16 +134,16 @@ fun BillTrackerScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("Bill Tracker", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                Text("Never miss a payment", color = SharkMuted, fontSize = 13.sp)
+                Text("Bill Tracker", color = SharkLabel, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                Text("Never miss a payment", color = SharkSecondary, fontSize = 13.sp)
             }
             IconButton(
                 onClick = { showAddBill = true },
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(SharkGreen.copy(alpha = 0.1f))
+                    .background(SharkGold.copy(alpha = 0.1f))
             ) {
-                Icon(Icons.Default.Add, null, tint = SharkGreen)
+                Icon(Icons.Default.Add, null, tint = SharkGold)
             }
         }
 
@@ -159,19 +159,19 @@ fun BillTrackerScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .glassCard(alpha = 0.1f)
+                .glassCard()
                 .padding(20.dp)
         ) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("PROJECTED BALANCE", color = SharkMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                    Text("$${String.format("%.2f", projectedEndBalance)}", color = if (projectedEndBalance >= 0) SharkGreen else SharkRed, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    Text("End of month estimate", color = SharkMuted, fontSize = 11.sp)
+                    Text("PROJECTED BALANCE", color = SharkSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Text("$${String.format("%.2f", projectedEndBalance)}", color = if (projectedEndBalance >= 0) SharkGold else SharkRed, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Text("End of month estimate", color = SharkSecondary, fontSize = 11.sp)
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("UPCOMING", color = SharkMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Text("UPCOMING", color = SharkSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                     Text("$${String.format("%.2f", totalUnpaid)}", color = SharkAmber, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    Text("${unpaidBills.size} pending", color = SharkMuted, fontSize = 11.sp)
+                    Text("${unpaidBills.size} pending", color = SharkSecondary, fontSize = 11.sp)
                 }
             }
 
@@ -231,10 +231,10 @@ fun BillTrackerScreen(
                 item {
                     Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.AutoMirrored.Filled.ReceiptLong, null, tint = SharkMuted, modifier = Modifier.size(48.dp))
+                            Icon(Icons.AutoMirrored.Filled.ReceiptLong, null, tint = SharkSecondary, modifier = Modifier.size(48.dp))
                             Spacer(Modifier.height(12.dp))
-                            Text("No bills yet", color = SharkMuted, fontSize = 16.sp)
-                            Text("Log recurring costs to see projections", color = SharkMuted.copy(alpha = 0.6f), fontSize = 12.sp)
+                            Text("No bills yet", color = SharkSecondary, fontSize = 16.sp)
+                            Text("Log recurring costs to see projections", color = SharkSecondary.copy(alpha = 0.6f), fontSize = 12.sp)
                         }
                     }
                 }
@@ -267,26 +267,26 @@ fun BillRowItem(bill: Bill, uid: String, db: FirebaseFirestore, onClick: () -> U
         Box(
             modifier = Modifier
                 .size(40.dp)
-                .background(if (bill.isPaid) SharkMuted.copy(alpha = 0.1f) else category.color.copy(alpha = 0.1f), CircleShape),
+                .background(if (bill.isPaid) SharkSecondary.copy(alpha = 0.1f) else category.color.copy(alpha = 0.1f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Icon(category.icon, null, tint = if (bill.isPaid) SharkMuted else category.color, modifier = Modifier.size(20.dp))
+            Icon(category.icon, null, tint = if (bill.isPaid) SharkSecondary else category.color, modifier = Modifier.size(20.dp))
         }
 
         Spacer(Modifier.width(16.dp))
 
         Column(Modifier.weight(1f)) {
-            Text(bill.name, color = if (bill.isPaid) SharkMuted else Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Text("Due: ${ordinal(bill.dayOfMonth)} · ${bill.recurrence}", color = SharkMuted, fontSize = 12.sp)
+            Text(bill.name, color = if (bill.isPaid) SharkSecondary else SharkLabel, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text("Due: ${ordinal(bill.dayOfMonth)} · ${bill.recurrence}", color = SharkSecondary, fontSize = 12.sp)
         }
 
         Column(horizontalAlignment = Alignment.End) {
-            Text("$${String.format("%.0f", bill.amount)}", color = if (bill.isPaid) SharkMuted else Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text("$${String.format("%.0f", bill.amount)}", color = if (bill.isPaid) SharkSecondary else SharkLabel, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(6.dp))
-                    .background(if (bill.isPaid) SharkGreen.copy(alpha = 0.1f) else SharkAmber.copy(alpha = 0.1f))
+                    .background(if (bill.isPaid) SharkGold.copy(alpha = 0.1f) else SharkAmber.copy(alpha = 0.1f))
                     .clickable {
                         scope.launch {
                             val nextPaid = !bill.isPaid
@@ -311,7 +311,7 @@ fun BillRowItem(bill: Bill, uid: String, db: FirebaseFirestore, onClick: () -> U
             ) {
                 Text(
                     if (bill.isPaid) "PAID" else "PAY",
-                    color = if (bill.isPaid) SharkGreen else SharkAmber,
+                    color = if (bill.isPaid) SharkGold else SharkAmber,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -332,8 +332,8 @@ fun AddBillSheet(uid: String, db: FirebaseFirestore, onDismiss: () -> Unit) {
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = SharkBase,
-        contentColor = Color.White
+        containerColor = SharkSurface,
+        contentColor = SharkLabel
     ) {
         Column(
             modifier = Modifier
@@ -341,13 +341,13 @@ fun AddBillSheet(uid: String, db: FirebaseFirestore, onDismiss: () -> Unit) {
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Text("Add New Bill", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("Add New Bill", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = SharkLabel)
 
             SheetInputField(name, { name = it }, "BILL NAME", "e.g. Rent, Electric")
             SheetInputField(amount, { amount = it }, "AMOUNT", "0.00", KeyboardType.Decimal)
             SheetInputField(day, { day = it }, "DUE DAY (1-31)", "1", KeyboardType.Number)
 
-            Text("CATEGORY", color = SharkMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text("CATEGORY", color = SharkSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 billCategories.take(4).forEach { cat ->
                     CategoryPill(cat.name, selectedCategory == cat.name) { selectedCategory = cat.name }
@@ -367,10 +367,10 @@ fun AddBillSheet(uid: String, db: FirebaseFirestore, onDismiss: () -> Unit) {
                     db.collection("users").document(uid).collection("bills").add(bill).addOnSuccessListener { onDismiss() }
                 },
                 modifier = Modifier.fillMaxWidth().height(54.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SharkGreen),
+                colors = ButtonDefaults.buttonColors(containerColor = SharkGold),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Text("Save Bill", color = Color.Black, fontWeight = FontWeight.Bold)
+                Text("Save Bill", color = SharkBg, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.height(20.dp))
         }
@@ -382,12 +382,12 @@ fun CategoryPill(name: String, isSelected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(if (isSelected) SharkNavy.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.05f))
-            .border(1.dp, if (isSelected) SharkNavy else Color.Transparent, RoundedCornerShape(12.dp))
+            .background(if (isSelected) SharkGold.copy(alpha = 0.15f) else SharkSurface)
+            .border(1.dp, if (isSelected) SharkGold else SharkCardBorder, RoundedCornerShape(12.dp))
             .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Text(name, color = if (isSelected) SharkNavy else SharkMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Text(name, color = if (isSelected) SharkGold else SharkSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -402,13 +402,13 @@ fun BillDetailSheet(bill: Bill, uid: String, db: FirebaseFirestore, onDismiss: (
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = SharkSurface) {
         Column(modifier = Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Edit Bill", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("Edit Bill", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SharkLabel)
             
             SheetInputField(name, { name = it }, "BILL NAME", "e.g. Rent")
             SheetInputField(amount, { amount = it }, "AMOUNT", "0.00", KeyboardType.Decimal)
             SheetInputField(day, { day = it }, "DUE DAY (1-31)", "1", KeyboardType.Number)
 
-            Text("CATEGORY", color = SharkMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text("CATEGORY", color = SharkSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 billCategories.take(4).forEach { cat ->
                     CategoryPill(cat.name, selectedCategory == cat.name) { selectedCategory = cat.name }
@@ -429,10 +429,10 @@ fun BillDetailSheet(bill: Bill, uid: String, db: FirebaseFirestore, onDismiss: (
                         )).addOnSuccessListener { onDismiss() }
                 },
                 modifier = Modifier.fillMaxWidth().height(54.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SharkGreen),
+                colors = ButtonDefaults.buttonColors(containerColor = SharkGold),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Text("Update Bill", color = Color.Black, fontWeight = FontWeight.Bold)
+                Text("Update Bill", color = SharkBg, fontWeight = FontWeight.Bold)
             }
 
             Button(

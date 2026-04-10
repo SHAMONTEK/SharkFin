@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -28,6 +29,7 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,205 +47,72 @@ data class SharkFeature(
 )
 
 // ─── Features Screen ───────────────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FeaturesScreen(onFeatureClick: (String) -> Unit) {
+fun FixedExpensesSettingsScreen(uid: String, db: com.google.firebase.firestore.FirebaseFirestore) {
+    var rent by remember { mutableStateOf("") }
+    var carNote by remember { mutableStateOf("") }
+    var gas by remember { mutableStateOf("") }
+    var subs by remember { mutableStateOf("") }
 
-    val allFeatures = listOf(
-        SharkFeature(
-            name        = "Expense Tracker",
-            icon        = Icons.Default.AccountBalanceWallet,
-            color       = SharkGreen,
-            available   = true,
-            description = "Keep track of every dollar you spend",
-            tag         = ""
-        ),
-        SharkFeature(
-            name        = "Import Statement",
-            icon        = Icons.Default.FileUpload,
-            color       = SharkGreen,
-            available   = true,
-            description = "Import your bank activity for a fast start",
-            tag         = "NEW"
-        ),
-        SharkFeature(
-            name        = "Bill Tracker",
-            icon        = Icons.Default.Receipt,
-            color       = Color(0xFFf59e0b),
-            available   = true,
-            description = "Never miss a payment with smart reminders",
-            tag         = ""
-        ),
-        SharkFeature(
-            name        = "Goal Tracker",
-            icon        = Icons.Default.Flag,
-            color       = Color(0xFF06b6d4),
-            available   = true,
-            description = "Plan for big wins and track your pace",
-            tag         = ""
-        ),
-        SharkFeature(
-            name        = "Visual Models",
-            icon        = Icons.Default.BarChart,
-            color       = Color(0xFF8b5cf6),
-            available   = true,
-            description = "Visual maps of your spending and savings",
-            tag         = ""
-        ),
-        SharkFeature(
-            name        = "Tax Tracker",
-            icon        = Icons.Default.Description,
-            color       = Color(0xFFef4444),
-            available   = true,
-            description = "Simple estimate of what you'll owe in 2024",
-            tag         = "BETA"
-        ),
-        SharkFeature(
-            name        = "Inflation Calc",
-            icon        = Icons.Default.Calculate,
-            color       = Color(0xFF06b6d4),
-            available   = true,
-            description = "See how your money's power changes over time",
-            tag         = "BETA"
-        ),
-        SharkFeature(
-            name        = "Dividend Tracker",
-            icon        = Icons.Default.Payments,
-            color       = SharkNavy,
-            available   = true,
-            description = "Track your investment income and payouts",
-            tag         = "NEW"
-        ),
-        SharkFeature(
-            name        = "Stock/Forex",
-            icon        = Icons.Default.CurrencyExchange,
-            color       = SharkGreen,
-            available   = true,
-            description = "Check stocks and battle against the market",
-            tag         = "UPDATED"
-        ),
-        SharkFeature(
-            name        = "Account Settings",
-            icon        = Icons.Default.Settings,
-            color       = Color(0xFF6b7280),
-            available   = true,
-            description = "Customize your app and keep data safe",
-            tag         = ""
-        ),
-        SharkFeature(
-            name        = "AI Coach",
-            icon        = Icons.Default.Psychology,
-            color       = Color(0xFF8b5cf6),
-            available   = false,
-            description = "Ask questions and log things by talking",
-            tag         = "SOON"
-        ),
-        SharkFeature(
-            name        = "Investment Tracker",
-            icon        = Icons.Default.TrendingUp,
-            color       = SharkGreen,
-            available   = false,
-            description = "See how your investments grow over time",
-            tag         = "SOON"
-        ),
-        SharkFeature(
-            name        = "AI Prediction",
-            icon        = Icons.Default.AutoGraph,
-            color       = Color(0xFFec4899),
-            available   = false,
-            description = "Peek into the future of your bank balance",
-            tag         = "SOON"
-        ),
-        SharkFeature(
-            name        = "Shared Accounts",
-            icon        = Icons.Default.People,
-            color       = Color(0xFFf59e0b),
-            available   = false,
-            description = "Manage money together with family",
-            tag         = "SOON"
+    LaunchedEffect(uid) {
+        db.collection("users").document(uid).collection("recurringBills").get()
+            .addOnSuccessListener { snapshot ->
+                snapshot.documents.forEach { doc ->
+                    val key = doc.getString("key")
+                    val amount = doc.getDouble("amount")?.toString() ?: ""
+                    when (key) {
+                        "rent" -> rent = amount
+                        "car_note" -> carNote = amount
+                        "gas_bill" -> gas = amount
+                        "subscriptions" -> subs = amount
+                    }
+                }
+            }
+    }
+
+    fun saveBill(key: String, label: String, amountStr: String) {
+        val amount = amountStr.toDoubleOrNull() ?: 0.0
+        val data = mapOf(
+            "key" to key,
+            "label" to label,
+            "amount" to amount,
+            "category" to when(key) {
+                "rent" -> "Housing"
+                "car_note" -> "Transit"
+                "gas_bill" -> "Utilities"
+                else -> "Subscriptions"
+            }
         )
-    )
-
-    val available   = allFeatures.filter { it.available }
-    val comingSoon  = allFeatures.filter { !it.available }
-
-    var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(80)
-        visible = true
+        db.collection("users").document(uid).collection("recurringBills").document(key).set(data)
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(SharkBg)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
+            .padding(24.dp)
     ) {
-        Spacer(Modifier.height(56.dp))
+        Spacer(Modifier.height(80.dp))
+        Text("Fixed Expenses", color = SharkLabel, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        Text("Set your monthly commitments", color = SharkSecondary, fontSize = 14.sp)
 
-        AnimatedVisibility(
-            visible = visible,
-            enter   = fadeIn(tween(400)) + slideInVertically(tween(400)) { -20 }
-        ) {
-            Column {
-                Text(
-                    "Features",
-                    color      = Color.White,
-                    fontSize   = 30.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.5).sp
-                )
-                Text(
-                    "${available.size} active · ${comingSoon.size} coming soon",
-                    color    = SharkMuted,
-                    fontSize = 13.sp
-                )
-            }
+        Spacer(Modifier.height(32.dp))
+
+        SharkCard {
+            SheetInputField(rent, { rent = it; saveBill("rent", "Rent", it) }, "MONTHLY RENT", "0.00", KeyboardType.Decimal)
+            Spacer(Modifier.height(16.dp))
+            SheetInputField(carNote, { carNote = it; saveBill("car_note", "Car Note", it) }, "CAR NOTE", "0.00", KeyboardType.Decimal)
+            Spacer(Modifier.height(16.dp))
+            SheetInputField(gas, { gas = it; saveBill("gas_bill", "Gas Bill", it) }, "ESTIMATED GAS", "0.00", KeyboardType.Decimal)
+            Spacer(Modifier.height(16.dp))
+            SheetInputField(subs, { subs = it; saveBill("subscriptions", "Subscriptions", it) }, "TOTAL SUBSCRIPTIONS", "0.00", KeyboardType.Decimal)
         }
 
-        Spacer(Modifier.height(24.dp))
-
-        AnimatedVisibility(
-            visible = visible,
-            enter   = fadeIn(tween(500, delayMillis = 100)) + slideInVertically(tween(500, 100)) { 30 }
-        ) {
-            HeroStripCard()
-        }
-
-        Spacer(Modifier.height(28.dp))
-
-        Text(
-            "YOUR TOOLKIT",
-            color         = SharkMuted,
-            fontSize      = 11.sp,
-            fontWeight    = FontWeight.Bold,
-            letterSpacing = 2.sp
-        )
-        Spacer(Modifier.height(12.dp))
-
-        available.chunked(2).forEachIndexed { rowIndex, row ->
-            AnimatedVisibility(
-                visible = visible,
-                enter   = fadeIn(tween(400, delayMillis = 150 + rowIndex * 60)) +
-                        slideInVertically(tween(400, 150 + rowIndex * 60)) { 40 }
-            ) {
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    row.forEach { feature ->
-                        FeatureCard(
-                            feature  = feature,
-                            modifier = Modifier.weight(1f),
-                            onClick  = { onFeatureClick(feature.name) }
-                        )
-                    }
-                    if (row.size == 1) Spacer(Modifier.weight(1f))
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-        }
-
-        Spacer(Modifier.height(100.dp))
+        Spacer(Modifier.height(40.dp))
+        Text("These values update your 'Spendable Today' math on the home screen automatically.", 
+            color = SharkSecondary, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -266,16 +135,16 @@ fun HeroStripCard() {
             .clip(RoundedCornerShape(22.dp))
             .background(
                 Brush.linearGradient(
-                    colors = listOf(Color(0xFF0d2d1f), Color(0xFF091a13))
+                    colors = listOf(SharkSurface, SharkBg)
                 )
             )
             .border(
                 width = 1.dp,
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        SharkGreen.copy(alpha = 0.4f),
+                        SharkGold.copy(alpha = 0.4f),
                         Color.Transparent,
-                        SharkGreen.copy(alpha = 0.1f)
+                        SharkGold.copy(alpha = 0.1f)
                     )
                 ),
                 shape = RoundedCornerShape(22.dp)
@@ -292,12 +161,12 @@ fun HeroStripCard() {
                     Box(
                         modifier = Modifier
                             .size(8.dp)
-                            .background(SharkGreen.copy(alpha = glowAlpha), CircleShape)
+                            .background(SharkGold.copy(alpha = glowAlpha), CircleShape)
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         "LIVE · SYNCED",
-                        color         = SharkGreen,
+                        color         = SharkGold,
                         fontSize      = 10.sp,
                         fontWeight    = FontWeight.Bold,
                         letterSpacing = 2.sp
@@ -337,7 +206,7 @@ fun MiniBarViz() {
             .height(40.dp)
             .width(44.dp)
     ) {
-        listOf(h1 to SharkGreen, h2 to SharkGreen.copy(alpha = 0.6f), h3 to SharkGreen.copy(alpha = 0.35f))
+        listOf(h1 to SharkGold, h2 to SharkGold.copy(alpha = 0.6f), h3 to SharkGold.copy(alpha = 0.35f))
             .forEach { (h, color) ->
                 Box(
                     modifier = Modifier
@@ -369,7 +238,7 @@ fun FeatureCard(
             .clip(RoundedCornerShape(20.dp))
             .drawBehind {
                 drawRoundRect(
-                    color        = feature.color.copy(alpha = 0.06f),
+                    color        = SharkSurface,
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(20.dp.toPx())
                 )
                 drawLine(
@@ -380,17 +249,9 @@ fun FeatureCard(
                     cap         = StrokeCap.Round
                 )
             }
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.09f),
-                        Color.White.copy(alpha = 0.05f)
-                    )
-                )
-            )
             .border(
-                width = 1.dp,
-                color = feature.color.copy(alpha = 0.12f),
+                width = 0.5.dp,
+                color = SharkCardBorder,
                 shape = RoundedCornerShape(20.dp)
             )
             .clickable {
@@ -465,8 +326,8 @@ fun ComingSoonRow(feature: SharkFeature) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(Color.White.copy(alpha = 0.03f))
-            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+            .background(SharkSurface)
+            .border(0.5.dp, SharkCardBorder, RoundedCornerShape(16.dp))
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -571,12 +432,7 @@ fun OnboardingScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.radialGradient(
-                    colors = listOf(Color(0xFF0a1a14), SharkBlack),
-                    radius = 1400f
-                )
-            )
+            .background(SharkBg)
     ) {
         Column(
             modifier            = Modifier
@@ -696,12 +552,12 @@ fun OnboardingScreen(
                         }
                     },
                     shape  = RoundedCornerShape(50.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = step.color),
+                    colors = ButtonDefaults.buttonColors(containerColor = SharkGold),
                     modifier = Modifier.height(52.dp)
                 ) {
                     Text(
                         if (isLast) "Let's go 🦈" else "Next",
-                        color      = Color.Black,
+                        color      = SharkBg,
                         fontWeight = FontWeight.Bold,
                         fontSize   = 15.sp,
                         modifier   = Modifier.padding(horizontal = 16.dp)
@@ -711,7 +567,7 @@ fun OnboardingScreen(
                         Icon(
                             Icons.Default.ArrowForward,
                             null,
-                            tint     = Color.Black,
+                            tint     = SharkBg,
                             modifier = Modifier.size(16.dp)
                         )
                     }

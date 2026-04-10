@@ -70,13 +70,7 @@ fun AuthScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0xFF064e3b), Color.Black),
-                    startY = 0f,
-                    endY = Float.POSITIVE_INFINITY
-                )
-            )
+            .background(SharkBg)
     ) {
 
         // ── TOP BRANDING SECTION ──────────────────────────────────────────
@@ -115,7 +109,7 @@ fun AuthScreen(
 
             Text(
                 text = "Financial Growth",
-                color = Color(0xFF10b981),   // neon green accent
+                color = SharkGold,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 letterSpacing = 2.sp
@@ -142,7 +136,7 @@ fun AuthScreen(
                 .fillMaxWidth()
                 .graphicsLayer { this.translationY = translationY }
                 .clip(RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp)),
-            color = Color.White.copy(alpha = 0.08f)   // frosted glass effect
+            color = SharkSurface
         ) {
             // scrollable so nothing gets cut off when signup fields are showing
             Column(
@@ -184,9 +178,9 @@ fun AuthScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
+                            .border(1.dp, SharkCardBorder, RoundedCornerShape(20.dp))
                             .background(
-                                Color.White.copy(alpha = 0.05f),
+                                SharkBg,
                                 RoundedCornerShape(20.dp)
                             )
                             .clickable { dropdownExpanded = true }
@@ -215,7 +209,7 @@ fun AuthScreen(
                         DropdownMenu(
                             expanded = dropdownExpanded,
                             onDismissRequest = { dropdownExpanded = false },
-                            modifier = Modifier.background(Color(0xFF064e3b))
+                            modifier = Modifier.background(SharkSurface).border(1.dp, SharkCardBorder)
                         ) {
                             // Loop through all 4 account types and show each as an option
                             accountTypes.forEach { type ->
@@ -223,7 +217,7 @@ fun AuthScreen(
                                     text = {
                                         Text(
                                             "$type Account",
-                                            color = Color.White
+                                            color = SharkLabel
                                         )
                                     },
                                     onClick = {
@@ -277,12 +271,12 @@ fun AuthScreen(
                         .height(56.dp),
                     shape = RoundedCornerShape(20.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF10b981)  // neon green button
+                        containerColor = SharkGold
                     )
                 ) {
                     Text(
                         text = if (authMode == AuthMode.LOGIN) "Access Account" else "Create Portfolio",
-                        color = Color.Black,
+                        color = SharkBg,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp
                     )
@@ -296,7 +290,7 @@ fun AuthScreen(
                         "Secure biometric login enabled"
                     else
                         "By signing up, you agree to our Terms",
-                    color = Color.White.copy(alpha = 0.5f),
+                    color = SharkSecondary,
                     fontSize = 12.sp
                 )
             }

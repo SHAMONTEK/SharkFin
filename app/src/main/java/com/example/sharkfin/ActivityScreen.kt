@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,8 +41,8 @@ fun ActivityScreen(
     onAddExpense: () -> Unit = {},
     onEditExpense: (Expense) -> Unit = {}
 ) {
-    val totalIn = expenses.filter { it.category == "Income" }.sumOf { it.amount }
-    val totalOut = expenses.filter { it.category != "Income" }.sumOf { it.amount }
+    val totalIn = expenses.filter { SharkIncomeCategories.contains(it.category) }.sumOf { it.amount }
+    val totalOut = expenses.filter { !SharkIncomeCategories.contains(it.category) }.sumOf { it.amount }
     val net = totalIn - totalOut
 
     var showAddSheet by remember { mutableStateOf(false) }
@@ -50,7 +51,7 @@ fun ActivityScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(SharkBase)
+            .background(SharkBg)
             .padding(horizontal = 20.dp)
     ) {
         Spacer(Modifier.height(28.dp))
@@ -61,9 +62,9 @@ fun ActivityScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Activity", style = SharkTypography.headlineLarge, color = SharkTextPrimary)
+            Text("Activity", style = SharkTypography.headlineLarge, color = SharkLabel)
             IconButton(onClick = { /* Filter - todo */ }) {
-                Icon(Icons.Default.FilterList, null, tint = SharkTextPrimary)
+                Icon(Icons.Default.FilterList, null, tint = SharkLabel)
             }
         }
 
@@ -76,7 +77,7 @@ fun ActivityScreen(
         ) {
             SummaryPill("Total In", totalIn, SharkPositive, Modifier.weight(1f))
             SummaryPill("Total Out", totalOut, SharkNegative, Modifier.weight(1f))
-            SummaryPill("Net", net, if (net >= 0) SharkPositive else SharkNegative, Modifier.weight(1f))
+            SummaryPill("Net", net, if (net >= 0) SharkPositive else SharkGold, Modifier.weight(1f))
         }
 
         Spacer(Modifier.height(32.dp))
@@ -133,11 +134,12 @@ fun ActivityScreen(
 fun SummaryPill(label: String, amount: Double, color: Color, modifier: Modifier) {
     Column(
         modifier = modifier
-            .background(SharkSurface, RoundedCornerShape(12.dp))
+            .background(SharkSurface, RoundedCornerShape(22.dp))
+            .border(0.5.dp, SharkCardBorder, RoundedCornerShape(22.dp))
             .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(label, style = SharkTypography.labelMedium, color = SharkTextMuted, fontSize = 10.sp)
+        Text(label, style = SharkTypography.labelMedium, color = SharkSecondary, fontSize = 10.sp)
         Text(
             String.format(Locale.US, "$%.0f", amount),
             style = SharkTypography.bodyLarge.copy(fontWeight = FontWeight.Bold),
@@ -149,7 +151,7 @@ fun SummaryPill(label: String, amount: Double, color: Color, modifier: Modifier)
 @Composable
 fun TransactionRow(expense: Expense, onClick: () -> Unit) {
     val categoryColor = getCategoryColor(expense.category)
-    // CRASH FIX: Use createdAtDate which handles all timestamp types safely
+    val isIncome = SharkIncomeCategories.contains(expense.category)
     val dateStr = SimpleDateFormat("MMM dd, yyyy", Locale.US).format(expense.createdAtDate)
 
     Row(
@@ -178,20 +180,20 @@ fun TransactionRow(expense: Expense, onClick: () -> Unit) {
             Text(
                 text = expense.title,
                 style = SharkTypography.bodyLarge.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
-                color = SharkTextPrimary
+                color = SharkLabel
             )
             Text(
                 text = dateStr,
                 style = SharkTypography.labelMedium,
-                color = SharkTextMuted,
+                color = SharkSecondary,
                 fontSize = 10.sp
             )
         }
 
         Text(
-            text = String.format(Locale.US, (if (expense.category == "Income") "+" else "-") + "$%.2f", expense.amount),
+            text = String.format(Locale.US, (if (isIncome) "+" else "-") + "$%.2f", expense.amount),
             style = SharkTypography.bodyLarge.copy(fontFamily = DMMonoFontFamily),
-            color = if (expense.category == "Income") SharkPositive else SharkNegative
+            color = if (isIncome) SharkPositive else SharkGold
         )
     }
 }
@@ -204,14 +206,14 @@ fun EmptyActivityState() {
                 Icons.Default.ReceiptLong,
                 null,
                 modifier = Modifier.size(48.dp),
-                tint = SharkTextMuted
+                tint = SharkSecondary
             )
             Spacer(Modifier.height(16.dp))
-            Text("No transactions yet", style = SharkTypography.headlineMedium, color = SharkTextPrimary)
+            Text("No transactions yet", style = SharkTypography.headlineMedium, color = SharkLabel)
             Text(
                 "Add one from the Snapshot tab",
                 style = SharkTypography.bodyMedium,
-                color = SharkTextMuted,
+                color = SharkSecondary,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }
@@ -234,8 +236,9 @@ fun AddExpenseSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = SharkBase,
-        contentColor = SharkTextPrimary
+        containerColor = SharkSurface,
+        contentColor = SharkLabel,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = SharkSurfaceHigh) }
     ) {
         Column(
             modifier = Modifier
@@ -243,35 +246,35 @@ fun AddExpenseSheet(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Add Transaction", style = SharkTypography.titleLarge)
+            Text("Add Transaction", style = SharkTypography.headlineMedium, color = SharkLabel)
 
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
-                label = { Text("Title") },
+                label = { Text("Title", color = SharkSecondary) },
                 modifier = Modifier.fillMaxWidth(),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = SharkSurface,
-                    unfocusedContainerColor = SharkSurface,
-                    focusedTextColor = SharkTextPrimary,
-                    unfocusedTextColor = SharkTextPrimary,
-                    cursorColor = SharkGreen
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = SharkGold,
+                    unfocusedBorderColor = SharkCardBorder,
+                    cursorColor = SharkGold,
+                    focusedTextColor = SharkLabel,
+                    unfocusedTextColor = SharkLabel
                 )
             )
 
             OutlinedTextField(
                 value = amountStr,
                 onValueChange = { amountStr = it },
-                label = { Text("Amount") },
-                prefix = { Text("$") },
+                label = { Text("Amount", color = SharkSecondary) },
+                prefix = { Text("$", color = SharkGold) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = SharkSurface,
-                    unfocusedContainerColor = SharkSurface,
-                    focusedTextColor = SharkTextPrimary,
-                    unfocusedTextColor = SharkTextPrimary,
-                    cursorColor = SharkGreen
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = SharkGold,
+                    unfocusedBorderColor = SharkCardBorder,
+                    cursorColor = SharkGold,
+                    focusedTextColor = SharkLabel,
+                    unfocusedTextColor = SharkLabel
                 )
             )
 
@@ -284,26 +287,27 @@ fun AddExpenseSheet(
                     value = selectedCategory,
                     onValueChange = { },
                     readOnly = true,
-                    label = { Text("Category") },
+                    label = { Text("Category", color = SharkSecondary) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = SharkSurface,
-                        unfocusedContainerColor = SharkSurface,
-                        focusedTextColor = SharkTextPrimary,
-                        unfocusedTextColor = SharkTextPrimary
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = SharkGold,
+                        unfocusedBorderColor = SharkCardBorder,
+                        focusedTextColor = SharkLabel,
+                        unfocusedTextColor = SharkLabel
                     )
                 )
 
                 ExposedDropdownMenu(
                     expanded = expanded,
-                    onDismissRequest = { expanded = false }
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.background(SharkSurfaceHigh)
                 ) {
                     expenseCategories.forEach { cat ->
                         DropdownMenuItem(
-                            text = { Text(cat.name) },
+                            text = { Text(cat.name, color = SharkLabel) },
                             onClick = {
                                 selectedCategory = cat.name
                                 expanded = false
@@ -316,14 +320,14 @@ fun AddExpenseSheet(
             OutlinedTextField(
                 value = note,
                 onValueChange = { note = it },
-                label = { Text("Note (optional)") },
+                label = { Text("Note (optional)", color = SharkSecondary) },
                 modifier = Modifier.fillMaxWidth(),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = SharkSurface,
-                    unfocusedContainerColor = SharkSurface,
-                    focusedTextColor = SharkTextPrimary,
-                    unfocusedTextColor = SharkTextPrimary,
-                    cursorColor = SharkGreen
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = SharkGold,
+                    unfocusedBorderColor = SharkCardBorder,
+                    cursorColor = SharkGold,
+                    focusedTextColor = SharkLabel,
+                    unfocusedTextColor = SharkLabel
                 )
             )
 
@@ -367,9 +371,10 @@ fun AddExpenseSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SharkGreen)
+                colors = ButtonDefaults.buttonColors(containerColor = SharkGold),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Text("Save", color = Color.Black, fontWeight = FontWeight.Bold)
+                Text("Save", color = SharkBg, fontWeight = FontWeight.Bold)
             }
 
             Spacer(Modifier.height(32.dp))
@@ -394,8 +399,9 @@ fun EditExpenseSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = SharkBase,
-        contentColor = SharkTextPrimary
+        containerColor = SharkSurface,
+        contentColor = SharkLabel,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = SharkSurfaceHigh) }
     ) {
         Column(
             modifier = Modifier
@@ -403,35 +409,35 @@ fun EditExpenseSheet(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Edit Transaction", style = SharkTypography.titleLarge)
+            Text("Edit Transaction", style = SharkTypography.headlineMedium, color = SharkLabel)
 
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
-                label = { Text("Title") },
+                label = { Text("Title", color = SharkSecondary) },
                 modifier = Modifier.fillMaxWidth(),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = SharkSurface,
-                    unfocusedContainerColor = SharkSurface,
-                    focusedTextColor = SharkTextPrimary,
-                    unfocusedTextColor = SharkTextPrimary,
-                    cursorColor = SharkGreen
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = SharkGold,
+                    unfocusedBorderColor = SharkCardBorder,
+                    cursorColor = SharkGold,
+                    focusedTextColor = SharkLabel,
+                    unfocusedTextColor = SharkLabel
                 )
             )
 
             OutlinedTextField(
                 value = amountStr,
                 onValueChange = { amountStr = it },
-                label = { Text("Amount") },
-                prefix = { Text("$") },
+                label = { Text("Amount", color = SharkSecondary) },
+                prefix = { Text("$", color = SharkGold) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = SharkSurface,
-                    unfocusedContainerColor = SharkSurface,
-                    focusedTextColor = SharkTextPrimary,
-                    unfocusedTextColor = SharkTextPrimary,
-                    cursorColor = SharkGreen
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = SharkGold,
+                    unfocusedBorderColor = SharkCardBorder,
+                    cursorColor = SharkGold,
+                    focusedTextColor = SharkLabel,
+                    unfocusedTextColor = SharkLabel
                 )
             )
 
@@ -444,26 +450,27 @@ fun EditExpenseSheet(
                     value = selectedCategory,
                     onValueChange = { },
                     readOnly = true,
-                    label = { Text("Category") },
+                    label = { Text("Category", color = SharkSecondary) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = SharkSurface,
-                        unfocusedContainerColor = SharkSurface,
-                        focusedTextColor = SharkTextPrimary,
-                        unfocusedTextColor = SharkTextPrimary
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = SharkGold,
+                        unfocusedBorderColor = SharkCardBorder,
+                        focusedTextColor = SharkLabel,
+                        unfocusedTextColor = SharkLabel
                     )
                 )
 
                 ExposedDropdownMenu(
                     expanded = expanded,
-                    onDismissRequest = { expanded = false }
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.background(SharkSurfaceHigh)
                 ) {
                     expenseCategories.forEach { cat ->
                         DropdownMenuItem(
-                            text = { Text(cat.name) },
+                            text = { Text(cat.name, color = SharkLabel) },
                             onClick = {
                                 selectedCategory = cat.name
                                 expanded = false
@@ -476,14 +483,14 @@ fun EditExpenseSheet(
             OutlinedTextField(
                 value = note,
                 onValueChange = { note = it },
-                label = { Text("Note (optional)") },
+                label = { Text("Note (optional)", color = SharkSecondary) },
                 modifier = Modifier.fillMaxWidth(),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = SharkSurface,
-                    unfocusedContainerColor = SharkSurface,
-                    focusedTextColor = SharkTextPrimary,
-                    unfocusedTextColor = SharkTextPrimary,
-                    cursorColor = SharkGreen
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = SharkGold,
+                    unfocusedBorderColor = SharkCardBorder,
+                    cursorColor = SharkGold,
+                    focusedTextColor = SharkLabel,
+                    unfocusedTextColor = SharkLabel
                 )
             )
 
@@ -504,12 +511,13 @@ fun EditExpenseSheet(
                                 .addOnSuccessListener { onDismiss() }
                         }
                     },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).height(56.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = SharkRed,
                         containerColor = Color.Transparent
                     ),
-                    border = BorderStroke(1.dp, SharkRed)
+                    border = BorderStroke(1.dp, SharkRed),
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Text("Delete")
                 }
@@ -543,10 +551,11 @@ fun EditExpenseSheet(
                                 }
                         }
                     },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = SharkGreen)
+                    modifier = Modifier.weight(1f).height(56.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = SharkGold),
+                    shape = RoundedCornerShape(16.dp)
                 ) {
-                    Text("Save", color = Color.Black, fontWeight = FontWeight.Bold)
+                    Text("Save", color = SharkBg, fontWeight = FontWeight.Bold)
                 }
             }
 
