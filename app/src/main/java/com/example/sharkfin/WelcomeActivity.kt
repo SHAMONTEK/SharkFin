@@ -4,51 +4,27 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.work.*
+import com.example.sharkfin.ui.theme.SharkFinTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.util.*
 import java.util.concurrent.TimeUnit
 
@@ -76,40 +52,41 @@ class WelcomeActivity : ComponentActivity() {
             return
         }
 
-        // Schedule Bill Reminders
         scheduleBillReminders()
 
         setContent {
-            var displayName by remember { mutableStateOf("Shark") }
-            var accountType by remember { mutableStateOf("INDIVIDUAL") }
-            var discoveryData by remember { mutableStateOf<Map<String, Any>?>(null) }
+            SharkFinTheme {
+                var displayName by remember { mutableStateOf("Shark") }
+                var accountType by remember { mutableStateOf("INDIVIDUAL") }
+                var discoveryData by remember { mutableStateOf<Map<String, Any>?>(null) }
 
-            LaunchedEffect(firebaseUser.uid) {
-                db.collection("users").document(firebaseUser.uid).get()
-                    .addOnSuccessListener { doc ->
-                        displayName = doc.getString("displayName") ?: "Shark"
-                        accountType = doc.getString("accountType") ?: "INDIVIDUAL"
-                        discoveryData = doc.data?.filterKeys { 
-                            it in listOf("monthlyIncome", "monthlyObligations", "targetSavings", "totalDebt", "discoveryCompleted")
+                LaunchedEffect(firebaseUser.uid) {
+                    db.collection("users").document(firebaseUser.uid).get()
+                        .addOnSuccessListener { doc ->
+                            displayName = doc.getString("displayName") ?: "Shark"
+                            accountType = doc.getString("accountType") ?: "INDIVIDUAL"
+                            discoveryData = doc.data?.filterKeys { 
+                                it in listOf("monthlyIncome", "monthlyObligations", "targetSavings", "totalDebt", "discoveryCompleted")
+                            }
                         }
-                    }
-            }
-
-            SharkFinDashboard(
-                uid = firebaseUser.uid,
-                displayName = displayName,
-                accountType = accountType,
-                discoveryData = discoveryData,
-                db = db,
-                onUpdateProfile = { newName -> displayName = newName },
-                onLogout = {
-                    auth.signOut()
-                    val intent = Intent(this@WelcomeActivity, MainActivity::class.java)
-                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    startActivity(intent)
-                    finish()
                 }
-            )
+
+                SharkFinDashboard(
+                    uid = firebaseUser.uid,
+                    displayName = displayName,
+                    accountType = accountType,
+                    discoveryData = discoveryData,
+                    db = db,
+                    onUpdateProfile = { newName -> displayName = newName },
+                    onLogout = {
+                        auth.signOut()
+                        val intent = Intent(this@WelcomeActivity, MainActivity::class.java)
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        startActivity(intent)
+                        finish()
+                    }
+                )
+            }
         }
     }
 
@@ -132,7 +109,6 @@ class WelcomeActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SharkFinDashboard(
     uid: String,
@@ -143,7 +119,6 @@ fun SharkFinDashboard(
     onUpdateProfile: (String) -> Unit,
     onLogout: () -> Unit
 ) {
-    // ── Unified Source of Truth (Single Dashboard State) ──
     var expenses      by remember { mutableStateOf(listOf<Expense>()) }
     var bills         by remember { mutableStateOf(listOf<Bill>()) }
     var goals         by remember { mutableStateOf(listOf<Goal>()) }
@@ -158,9 +133,7 @@ fun SharkFinDashboard(
     var openFeature by remember { mutableStateOf<String?>(null) }
     var showOnboarding by remember { mutableStateOf(false) }
 
-    // Unified Listeners: Everything updates from this single block
     LaunchedEffect(uid) {
-        // Listen for Expenses
         db.collection("users").document(uid)
             .collection("expenses")
             .orderBy("createdAt", Query.Direction.DESCENDING)
@@ -170,7 +143,6 @@ fun SharkFinDashboard(
                 } ?: emptyList()
             }
 
-        // Listen for Bills
         db.collection("users").document(uid)
             .collection("bills")
             .addSnapshotListener { snapshot, _ ->
@@ -179,7 +151,6 @@ fun SharkFinDashboard(
                 } ?: emptyList()
             }
 
-        // Listen for Goals
         db.collection("users").document(uid)
             .collection("goals")
             .addSnapshotListener { snapshot, _ ->
@@ -188,7 +159,6 @@ fun SharkFinDashboard(
                 } ?: emptyList()
             }
 
-        // Listen for Debts
         db.collection("users").document(uid)
             .collection("debts")
             .addSnapshotListener { snapshot, _ ->
@@ -197,7 +167,6 @@ fun SharkFinDashboard(
                 } ?: emptyList()
             }
 
-        // Listen for Income Sources
         db.collection("users").document(uid)
             .collection("incomeSources")
             .addSnapshotListener { snapshot, _ ->
@@ -206,7 +175,6 @@ fun SharkFinDashboard(
                 } ?: emptyList()
             }
 
-        // Listen for recurring bills from Firestore
         db.collection("users").document(uid)
             .collection("recurringBills")
             .addSnapshotListener { snapshot, _ ->
@@ -220,7 +188,6 @@ fun SharkFinDashboard(
                 } ?: emptyList()
             }
 
-        // Listen for Portfolio
         db.collection("users").document(uid)
             .collection("portfolio")
             .addSnapshotListener { snapshot, _ ->
@@ -241,12 +208,7 @@ fun SharkFinDashboard(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.radialGradient(
-                    colors = listOf(SharkDeepOcean, SharkBlack),
-                    radius = 1200f
-                )
-            )
+            .background(MaterialTheme.colorScheme.background)
     ) {
         HomeScreen(
             uid              = uid,
@@ -280,8 +242,8 @@ fun SharkFinDashboard(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = 24.dp, bottom = 110.dp),
-                containerColor = SharkNavy,
-                contentColor = Color.White,
+                containerColor = SharkGold,
+                contentColor = SharkBg,
                 shape = CircleShape
             ) {
                 Icon(Icons.Default.Add, "Add Transaction", modifier = Modifier.size(28.dp))
@@ -292,9 +254,7 @@ fun SharkFinDashboard(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(colors = listOf(SharkDeepOcean, SharkBlack), radius = 1200f)
-                    )
+                    .background(MaterialTheme.colorScheme.background)
             ) {
                 when (openFeature) {
                     "Activity"         -> ActivityScreen(expenses, bills, uid, db)
@@ -321,7 +281,7 @@ fun SharkFinDashboard(
                         modifier = Modifier
                             .padding(top = 56.dp, start = 20.dp)
                             .size(44.dp)
-                            .glassCard(22f, 0.15f)
+                            .background(SharkSurface.copy(alpha = 0.5f), CircleShape)
                             .clickable { openFeature = null },
                         contentAlignment = Alignment.Center
                     ) {
@@ -358,10 +318,10 @@ fun SharkFinDashboard(
 fun ComingSoonPlaceholder(feature: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.HourglassEmpty, null, tint = SharkMuted, modifier = Modifier.size(64.dp))
+            Icon(Icons.Default.HourglassEmpty, null, tint = SharkSecondary, modifier = Modifier.size(64.dp))
             Spacer(Modifier.height(16.dp))
             Text("$feature", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            Text("Module under development", color = SharkMuted, fontSize = 16.sp)
+            Text("Module under development", color = SharkSecondary, fontSize = 16.sp)
         }
     }
 }

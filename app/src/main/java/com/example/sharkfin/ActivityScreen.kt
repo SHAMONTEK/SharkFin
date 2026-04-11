@@ -37,15 +37,18 @@ fun ActivityScreen(
     expenses: List<Expense>,
     bills: List<Bill>,
     uid: String,
-    db: FirebaseFirestore,
-    onAddExpense: () -> Unit = {},
-    onEditExpense: (Expense) -> Unit = {}
+    db: FirebaseFirestore
 ) {
-    val totalIn = expenses.filter { SharkIncomeCategories.contains(it.category) }.sumOf { it.amount }
-    val totalOut = expenses.filter { !SharkIncomeCategories.contains(it.category) }.sumOf { it.amount }
-    val net = totalIn - totalOut
+    val totalIn by remember(expenses) {
+        derivedStateOf { expenses.filter { SharkIncomeCategories.contains(it.category) }.sumOf { it.amount } }
+    }
+    val totalOut by remember(expenses) {
+        derivedStateOf { expenses.filter { !SharkIncomeCategories.contains(it.category) }.sumOf { it.amount } }
+    }
+    val net by remember(totalIn, totalOut) {
+        derivedStateOf { totalIn - totalOut }
+    }
 
-    var showAddSheet by remember { mutableStateOf(false) }
     var editingExpense by remember { mutableStateOf<Expense?>(null) }
 
     Column(
@@ -63,7 +66,7 @@ fun ActivityScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("Activity", style = SharkTypography.headlineLarge, color = SharkLabel)
-            IconButton(onClick = { /* Filter - todo */ }) {
+            IconButton(onClick = { /* Filter functionality can be added here */ }) {
                 Icon(Icons.Default.FilterList, null, tint = SharkLabel)
             }
         }
@@ -81,7 +84,7 @@ fun ActivityScreen(
         }
 
         Spacer(Modifier.height(32.dp))
-        SharkSectionHeader("THIS MONTH")
+        SharkSectionHeader("RECENT TRANSACTIONS")
         Spacer(Modifier.height(16.dp))
 
         if (expenses.isEmpty()) {
@@ -92,14 +95,13 @@ fun ActivityScreen(
                 contentPadding = PaddingValues(bottom = 100.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                itemsIndexed(expenses) { index, expense ->
-                    val delay = index * 40
+                itemsIndexed(expenses, key = { _, expense -> expense.id }) { index, expense ->
                     val state = remember { MutableTransitionState(false) }.apply { targetState = true }
 
                     AnimatedVisibility(
                         visibleState = state,
-                        enter = fadeIn(animationSpec = tween(500, delayMillis = delay)) +
-                                slideInVertically(animationSpec = tween(500, delayMillis = delay)) { it / 2 }
+                        enter = fadeIn(animationSpec = tween(500, delayMillis = (index % 10) * 50)) +
+                                slideInVertically(animationSpec = tween(500, delayMillis = (index % 10) * 50)) { it / 2 }
                     ) {
                         TransactionRow(
                             expense = expense,
@@ -109,15 +111,6 @@ fun ActivityScreen(
                 }
             }
         }
-    }
-
-    // Bottom Sheets
-    if (showAddSheet) {
-        AddExpenseSheet(
-            uid = uid,
-            db = db,
-            onDismiss = { showAddSheet = false }
-        )
     }
 
     editingExpense?.let { expense ->
@@ -150,14 +143,16 @@ fun SummaryPill(label: String, amount: Double, color: Color, modifier: Modifier)
 
 @Composable
 fun TransactionRow(expense: Expense, onClick: () -> Unit) {
-    val categoryColor = getCategoryColor(expense.category)
-    val isIncome = SharkIncomeCategories.contains(expense.category)
-    val dateStr = SimpleDateFormat("MMM dd, yyyy", Locale.US).format(expense.createdAtDate)
+    val categoryColor = remember(expense.category) { getCategoryColor(expense.category) }
+    val isIncome = remember(expense.category) { SharkIncomeCategories.contains(expense.category) }
+    val dateStr = remember(expense.createdAtDate) { SimpleDateFormat("MMM dd, yyyy", Locale.US).format(expense.createdAtDate) }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() },
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
@@ -206,12 +201,12 @@ fun EmptyActivityState() {
                 Icons.Default.ReceiptLong,
                 null,
                 modifier = Modifier.size(48.dp),
-                tint = SharkSecondary
+                tint = SharkSecondary.copy(alpha = 0.5f)
             )
             Spacer(Modifier.height(16.dp))
             Text("No transactions yet", style = SharkTypography.headlineMedium, color = SharkLabel)
             Text(
-                "Add one from the Snapshot tab",
+                "Add transactions using the AI Assistant\nor the Snapshot tools.",
                 style = SharkTypography.bodyMedium,
                 color = SharkSecondary,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -243,7 +238,9 @@ fun AddExpenseSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
+                .padding(24.dp)
+                .navigationBarsPadding()
+                .imePadding(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text("Add Transaction", style = SharkTypography.headlineMedium, color = SharkLabel)
@@ -259,7 +256,8 @@ fun AddExpenseSheet(
                     cursorColor = SharkGold,
                     focusedTextColor = SharkLabel,
                     unfocusedTextColor = SharkLabel
-                )
+                ),
+                shape = RoundedCornerShape(12.dp)
             )
 
             OutlinedTextField(
@@ -275,7 +273,8 @@ fun AddExpenseSheet(
                     cursorColor = SharkGold,
                     focusedTextColor = SharkLabel,
                     unfocusedTextColor = SharkLabel
-                )
+                ),
+                shape = RoundedCornerShape(12.dp)
             )
 
             var expanded by remember { mutableStateOf(false) }
@@ -297,7 +296,8 @@ fun AddExpenseSheet(
                         unfocusedBorderColor = SharkCardBorder,
                         focusedTextColor = SharkLabel,
                         unfocusedTextColor = SharkLabel
-                    )
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 )
 
                 ExposedDropdownMenu(
@@ -328,7 +328,8 @@ fun AddExpenseSheet(
                     cursorColor = SharkGold,
                     focusedTextColor = SharkLabel,
                     unfocusedTextColor = SharkLabel
-                )
+                ),
+                shape = RoundedCornerShape(12.dp)
             )
 
             errorMsg?.let {
@@ -371,10 +372,10 @@ fun AddExpenseSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SharkGold),
+                colors = ButtonDefaults.buttonColors(containerColor = SharkGold, contentColor = SharkBg),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Text("Save", color = SharkBg, fontWeight = FontWeight.Bold)
+                Text("Save", fontWeight = FontWeight.Bold)
             }
 
             Spacer(Modifier.height(32.dp))
@@ -406,7 +407,9 @@ fun EditExpenseSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
+                .padding(24.dp)
+                .navigationBarsPadding()
+                .imePadding(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text("Edit Transaction", style = SharkTypography.headlineMedium, color = SharkLabel)
@@ -422,7 +425,8 @@ fun EditExpenseSheet(
                     cursorColor = SharkGold,
                     focusedTextColor = SharkLabel,
                     unfocusedTextColor = SharkLabel
-                )
+                ),
+                shape = RoundedCornerShape(12.dp)
             )
 
             OutlinedTextField(
@@ -438,7 +442,8 @@ fun EditExpenseSheet(
                     cursorColor = SharkGold,
                     focusedTextColor = SharkLabel,
                     unfocusedTextColor = SharkLabel
-                )
+                ),
+                shape = RoundedCornerShape(12.dp)
             )
 
             var expanded by remember { mutableStateOf(false) }
@@ -460,7 +465,8 @@ fun EditExpenseSheet(
                         unfocusedBorderColor = SharkCardBorder,
                         focusedTextColor = SharkLabel,
                         unfocusedTextColor = SharkLabel
-                    )
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 )
 
                 ExposedDropdownMenu(
@@ -491,7 +497,8 @@ fun EditExpenseSheet(
                     cursorColor = SharkGold,
                     focusedTextColor = SharkLabel,
                     unfocusedTextColor = SharkLabel
-                )
+                ),
+                shape = RoundedCornerShape(12.dp)
             )
 
             errorMsg?.let {
@@ -552,10 +559,10 @@ fun EditExpenseSheet(
                         }
                     },
                     modifier = Modifier.weight(1f).height(56.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = SharkGold),
+                    colors = ButtonDefaults.buttonColors(containerColor = SharkGold, contentColor = SharkBg),
                     shape = RoundedCornerShape(16.dp)
                 ) {
-                    Text("Save", color = SharkBg, fontWeight = FontWeight.Bold)
+                    Text("Save", fontWeight = FontWeight.Bold)
                 }
             }
 

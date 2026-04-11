@@ -1,6 +1,7 @@
 package com.example.sharkfin
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,7 +21,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sharkfin.ui.theme.*
@@ -30,25 +30,27 @@ import java.util.*
 fun SnapshotScreen(
     expenses: List<Expense>,
     bills: List<Bill>,
-    goals: List<Goal>,
     uid: String,
     onFeatureClick: (String) -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(SharkBg)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
     ) {
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(56.dp))
         SmartGreetingZone()
-        Spacer(Modifier.height(24.dp))
-        PulseCircleZone(expenses, bills)
         Spacer(Modifier.height(32.dp))
+        PulseCircleZone(expenses, bills)
+        Spacer(Modifier.height(40.dp))
         StatPillsZone(expenses)
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(32.dp))
+        SharkSectionHeader("QUICK ACCESS")
+        Spacer(Modifier.height(16.dp))
         QuickAccessStrip(onFeatureClick)
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(32.dp))
         if (expenses.isNotEmpty()) {
             TransactionFlowZone(expenses.take(5))
         }
@@ -65,67 +67,76 @@ fun SmartGreetingZone() {
         else -> "Good Evening"
     }
     Column {
-        Text(greeting, style = SharkTypography.bodyMedium, color = SharkTextMuted)
-        Text("Your Pulse is steady.", style = SharkTypography.headlineLarge, color = SharkTextPrimary)
+        Text(greeting.uppercase(), style = SharkTypography.labelSmall, color = SharkGold.copy(0.7f))
+        Text("Your Pulse is steady.", style = SharkTypography.headlineLarge, color = SharkLabel)
     }
 }
 
 @Composable
 fun PulseCircleZone(expenses: List<Expense>, bills: List<Bill>) {
-    val totalIncome = expenses.filter { it.category == "Income" }.sumOf { it.amount }
-    val totalSpent = expenses.filter { it.category != "Income" }.sumOf { it.amount }
-    val balance = totalIncome - totalSpent
-    val unpaidBills = bills.filter { !it.isPaid }.sumOf { it.amount }
-    
-    // Pulse ratio: spending vs income
-    val ratio = if (totalIncome > 0) (totalSpent / totalIncome).toFloat().coerceIn(0f, 1f) else 0.5f
-    val color = when {
-        ratio < 0.4f -> SharkPositive
-        ratio < 0.7f -> SharkGold
-        else -> SharkNegative
+    val metrics = remember(expenses, bills) {
+        val incomeCategories = SharkIncomeCategories
+        val totalIncome = expenses.filter { it.category in incomeCategories }.sumOf { it.amount }
+        val totalSpent = expenses.filter { it.category !in incomeCategories }.sumOf { it.amount }
+        val balance = totalIncome - totalSpent
+        val unpaidBills = bills.filter { !it.isPaid }.sumOf { it.amount }
+        val ratio = if (totalIncome > 0) (totalSpent / totalIncome).toFloat().coerceIn(0f, 1f) else 0.5f
+        
+        object {
+            val balance = balance
+            val unpaidBills = unpaidBills
+            val ratio = ratio
+            val color = when {
+                ratio < 0.4f -> SharkPositive
+                ratio < 0.7f -> SharkGold
+                else -> SharkNegative
+            }
+        }
     }
 
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        // Outer Glow/Pulse
-        Canvas(modifier = Modifier.size(240.dp)) {
+        Canvas(modifier = Modifier.size(220.dp)) {
             drawCircle(
-                color = color.copy(alpha = 0.05f),
+                color = metrics.color.copy(alpha = 0.03f),
                 radius = size.minDimension / 2
             )
             drawArc(
-                color = color,
+                color = metrics.color,
                 startAngle = -90f,
-                sweepAngle = 360f * ratio,
+                sweepAngle = 360f * metrics.ratio,
                 useCenter = false,
-                style = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round)
+                style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
             )
             drawArc(
-                color = SharkBorderSubtle,
-                startAngle = -90f + (360f * ratio),
-                sweepAngle = 360f * (1f - ratio),
+                color = SharkCardBorder,
+                startAngle = -90f + (360f * metrics.ratio),
+                sweepAngle = 360f * (1f - metrics.ratio),
                 useCenter = false,
-                style = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round)
+                style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
             )
         }
         
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("NET BALANCE", style = SharkTypography.labelMedium, color = SharkTextMuted)
+            Text("NET BALANCE", style = SharkTypography.labelSmall, color = SharkSecondary)
             Text(
-                String.format(Locale.US, "$%.2f", balance),
-                style = SharkTypography.displayLarge.copy(fontSize = 32.sp),
-                color = SharkTextPrimary
+                String.format(Locale.US, "$%,.2f", metrics.balance),
+                style = SharkTypography.headlineLarge.copy(fontSize = 32.sp),
+                color = SharkLabel
             )
-            Spacer(Modifier.height(8.dp))
-            Surface(
-                color = SharkGoldGlow,
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    String.format(Locale.US, "$%.0f in bills due", unpaidBills),
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                    style = SharkTypography.labelMedium,
-                    color = SharkGold
-                )
+            if (metrics.unpaidBills > 0) {
+                Spacer(Modifier.height(12.dp))
+                Surface(
+                    color = SharkGold.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(0.5.dp, SharkGold.copy(alpha = 0.2f))
+                ) {
+                    Text(
+                        String.format(Locale.US, "$%,.0f in bills due", metrics.unpaidBills),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        style = SharkTypography.labelSmall,
+                        color = SharkGold
+                    )
+                }
             }
         }
     }
@@ -133,10 +144,10 @@ fun PulseCircleZone(expenses: List<Expense>, bills: List<Bill>) {
 
 @Composable
 fun StatPillsZone(expenses: List<Expense>) {
-    val totalIncome = expenses.filter { it.category == "Income" }.sumOf { it.amount }
-    val totalSpent = expenses.filter { it.category != "Income" }.sumOf { it.amount }
+    val totalIncome = remember(expenses) { expenses.filter { SharkIncomeCategories.contains(it.category) }.sumOf { it.amount } }
+    val totalSpent = remember(expenses) { expenses.filter { !SharkIncomeCategories.contains(it.category) }.sumOf { it.amount } }
     
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         StatPill(
             label = "INCOME",
             amount = totalIncome,
@@ -154,15 +165,11 @@ fun StatPillsZone(expenses: List<Expense>) {
 
 @Composable
 fun StatPill(label: String, amount: Double, color: Color, modifier: Modifier) {
-    Column(
-        modifier = modifier
-            .background(SharkSurface, RoundedCornerShape(16.dp))
-            .border(1.dp, SharkBorderSubtle, RoundedCornerShape(16.dp))
-            .padding(16.dp)
-    ) {
-        Text(label, style = SharkTypography.labelMedium, color = SharkTextMuted)
+    SharkCard(modifier = modifier) {
+        Text(label, style = SharkTypography.labelSmall, color = SharkSecondary)
+        Spacer(Modifier.height(4.dp))
         Text(
-            String.format(Locale.US, "$%.0f", amount),
+            String.format(Locale.US, "$%,.0f", amount),
             style = SharkTypography.headlineMedium,
             color = color
         )
@@ -172,7 +179,7 @@ fun StatPill(label: String, amount: Double, color: Color, modifier: Modifier) {
 @Composable
 fun QuickAccessStrip(onFeatureClick: (String) -> Unit) {
     val items = listOf(
-        Triple("Bills", Icons.Default.Receipt, SharkWarning),
+        Triple("Bills", Icons.Default.Receipt, SharkAmber),
         Triple("Goals", Icons.Default.Flag, SharkInfo),
         Triple("Visuals", Icons.Default.BarChart, SharkGold),
         Triple("AI Coach", Icons.Default.AutoAwesome, SharkGold)
@@ -186,15 +193,16 @@ fun QuickAccessStrip(onFeatureClick: (String) -> Unit) {
             ) {
                 Box(
                     modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(SharkSurfaceHigh),
+                        .size(60.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(SharkSurfaceHigh)
+                        .border(0.5.dp, SharkCardBorder, RoundedCornerShape(16.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(icon, null, tint = color, modifier = Modifier.size(24.dp))
                 }
                 Spacer(Modifier.height(8.dp))
-                Text(name, style = SharkTypography.labelMedium, color = SharkTextSecondary)
+                Text(name, style = SharkTypography.labelSmall, color = SharkSecondary)
             }
         }
     }
@@ -203,9 +211,10 @@ fun QuickAccessStrip(onFeatureClick: (String) -> Unit) {
 @Composable
 fun TransactionFlowZone(recent: List<Expense>) {
     Column {
-        SharkSectionHeader("Recent Activity")
+        SharkSectionHeader("RECENT ACTIVITY")
         Spacer(Modifier.height(16.dp))
         recent.forEachIndexed { index, expense ->
+            val color = getCategoryColor(expense.category)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -216,28 +225,28 @@ fun TransactionFlowZone(recent: List<Expense>) {
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(getCategoryColor(expense.category).copy(alpha = 0.1f)),
+                        .background(color.copy(alpha = 0.1f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         expense.category.take(1),
-                        color = getCategoryColor(expense.category),
-                        fontWeight = FontWeight.Bold
+                        color = color,
+                        style = SharkTypography.bodyLarge.copy(fontWeight = FontWeight.Bold)
                     )
                 }
                 Spacer(Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(expense.title, style = SharkTypography.bodyLarge, color = SharkTextPrimary)
-                    Text(expense.category, style = SharkTypography.labelMedium, color = SharkTextMuted)
+                    Text(expense.title, style = SharkTypography.bodyLarge, color = SharkLabel)
+                    Text(expense.category.uppercase(), style = SharkTypography.labelSmall, color = SharkTextMuted)
                 }
                 Text(
-                    String.format(Locale.US, "$%.2f", expense.amount),
+                    String.format(Locale.US, "$%,.2f", expense.amount),
                     style = SharkTypography.bodyLarge.copy(fontFamily = DMMonoFontFamily),
-                    color = if (expense.category == "Income") SharkPositive else SharkNegative
+                    color = if (SharkIncomeCategories.contains(expense.category)) SharkPositive else SharkLabel
                 )
             }
             if (index < recent.size - 1) {
-                Box(Modifier.fillMaxWidth().height(1.dp).background(SharkBorderSubtle))
+                HorizontalDivider(color = SharkCardBorder, thickness = 0.5.dp)
             }
         }
     }

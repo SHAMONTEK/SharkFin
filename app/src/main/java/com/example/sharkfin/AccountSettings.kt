@@ -17,7 +17,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 fun AccountSettingsScreen() {
     val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
     val db = FirebaseFirestore.getInstance()
-    var showTutorial by remember { mutableStateOf(true) }
+    var showTutorial by remember { mutableStateOf(false) }
     
     var cloudSync by remember { mutableStateOf(true) }
     var biometricLock by remember { mutableStateOf(false) }
@@ -73,9 +73,6 @@ fun AccountSettingsScreen() {
             Spacer(modifier = Modifier.height(12.dp))
             Button(
                 onClick = {
-                    // Logic to reset specific screen tutorials
-                    // This assumes screens use local state or a "show_tutorial_flag"
-                    // For now, let's reset a global flag that screens could listen to
                     db.collection("users").document(uid).update("reset_tutorials_trigger", System.currentTimeMillis())
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
@@ -86,15 +83,15 @@ fun AccountSettingsScreen() {
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            Text("Danger Zone", color = Color(0xFFef4444), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text("Danger Zone", color = SharkRed, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(12.dp))
             Button(
                 onClick = { /* Logic to wipe collections */ }, 
                 modifier = Modifier.fillMaxWidth().height(50.dp), 
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFef4444).copy(alpha = 0.1f)), 
+                colors = ButtonDefaults.buttonColors(containerColor = SharkRed.copy(alpha = 0.1f)), 
                 shape = RoundedCornerShape(14.dp)
             ) {
-                Text("Delete All Data", color = Color(0xFFef4444))
+                Text("Delete All Data", color = SharkRed)
             }
         }
 
@@ -113,12 +110,12 @@ fun SettingToggle(title: String, subtitle: String, checked: Boolean, onCheckedCh
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(modifier = Modifier.weight(1f)) {
             Text(title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, color = SharkMuted, fontSize = 11.sp)
+            Text(subtitle, color = SharkSecondary, fontSize = 11.sp)
         }
         Switch(
             checked = checked, 
             onCheckedChange = onCheckedChange, 
-            colors = SwitchDefaults.colors(checkedThumbColor = SharkGreen, checkedTrackColor = SharkGreen.copy(alpha = 0.3f))
+            colors = SwitchDefaults.colors(checkedThumbColor = SharkPositive, checkedTrackColor = SharkPositive.copy(alpha = 0.3f))
         )
     }
 }

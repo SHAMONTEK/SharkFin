@@ -19,15 +19,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.sharkfin.ui.theme.*
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -50,7 +49,7 @@ fun QuickBillSetupGrid(uid: String, db: FirebaseFirestore) {
     var selectedKeys by remember { mutableStateOf(setOf<String>()) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text("TAP TO ADD COMMON BILLS", color = SharkSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        Text("TAP TO ADD COMMON BILLS", style = SharkTypography.labelSmall, color = SharkSecondary)
         Spacer(Modifier.height(12.dp))
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
@@ -62,8 +61,8 @@ fun QuickBillSetupGrid(uid: String, db: FirebaseFirestore) {
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
-                        .background(if (isSelected) SharkGold.copy(alpha = 0.2f) else SharkSurface)
-                        .border(1.dp, if (isSelected) SharkGold else SharkCardBorder, RoundedCornerShape(12.dp))
+                        .background(if (isSelected) SharkGold.copy(alpha = 0.15f) else SharkSurface)
+                        .border(0.5.dp, if (isSelected) SharkGold else SharkCardBorder, RoundedCornerShape(12.dp))
                         .clickable {
                             if (isSelected) {
                                 selectedKeys = selectedKeys - bill.key
@@ -86,7 +85,7 @@ fun QuickBillSetupGrid(uid: String, db: FirebaseFirestore) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (isSelected) Icon(Icons.Default.Check, null, tint = SharkGold, modifier = Modifier.size(14.dp))
                         if (isSelected) Spacer(Modifier.width(4.dp))
-                        Text(bill.label, color = if (isSelected) SharkGold else SharkLabel, fontSize = 12.sp)
+                        Text(bill.label, color = if (isSelected) SharkGold else SharkLabel, style = SharkTypography.labelMedium)
                     }
                 }
             }
@@ -110,15 +109,18 @@ fun BillTrackerScreen(
     var viewMonth by remember { mutableIntStateOf(today.get(Calendar.MONTH)) }
     var viewYear by remember { mutableIntStateOf(today.get(Calendar.YEAR)) }
     
-    // Coach marks state
-    var showProjectedCoach by remember { mutableStateOf(false) }
-    var showPayCoach by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        delay(800)
-        showProjectedCoach = true
-        delay(2000)
-        if (bills.isNotEmpty()) showPayCoach = true
+    val metrics = remember(expenses, bills) {
+        val unpaidBills = bills.filter { !it.isPaid }
+        val totalUnpaid = unpaidBills.sumOf { it.amount }
+        val totalIncome = expenses.filter { it.category == "Income" }.sumOf { it.amount }
+        val totalSpent = expenses.filter { it.category != "Income" }.sumOf { it.amount }
+        val projectedEndBalance = totalIncome - totalSpent - totalUnpaid
+        
+        object {
+            val totalUnpaid = totalUnpaid
+            val projectedEndBalance = projectedEndBalance
+            val unpaidCount = unpaidBills.size
+        }
     }
 
     Column(
@@ -134,8 +136,8 @@ fun BillTrackerScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("Bill Tracker", color = SharkLabel, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                Text("Never miss a payment", color = SharkSecondary, fontSize = 13.sp)
+                Text("Bill Tracker", style = SharkTypography.headlineLarge, color = SharkLabel)
+                Text("Never miss a payment", style = SharkTypography.labelMedium, color = SharkSecondary)
             }
             IconButton(
                 onClick = { showAddBill = true },
@@ -149,44 +151,23 @@ fun BillTrackerScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        // Upcoming Bills Summary & Projected Balance
-        val unpaidBills = bills.filter { !it.isPaid }
-        val totalUnpaid = unpaidBills.sumOf { it.amount }
-        val totalIncome = expenses.filter { it.category == "Income" }.sumOf { it.amount }
-        val totalSpent = expenses.filter { it.category != "Income" }.sumOf { it.amount }
-        val projectedEndBalance = totalIncome - totalSpent - totalUnpaid
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .glassCard()
-                .padding(20.dp)
-        ) {
+        SharkCard {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("PROJECTED BALANCE", color = SharkSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                    Text("$${String.format("%.2f", projectedEndBalance)}", color = if (projectedEndBalance >= 0) SharkGold else SharkRed, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    Text("End of month estimate", color = SharkSecondary, fontSize = 11.sp)
+                    Text("PROJECTED BALANCE", style = SharkTypography.labelSmall, color = SharkSecondary)
+                    Text("$${String.format("%.2f", metrics.projectedEndBalance)}", color = if (metrics.projectedEndBalance >= 0) SharkGold else SharkRed, style = SharkTypography.headlineLarge)
+                    Text("End of month estimate", style = SharkTypography.labelSmall, color = SharkSecondary)
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("UPCOMING", color = SharkSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                    Text("$${String.format("%.2f", totalUnpaid)}", color = SharkAmber, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    Text("${unpaidBills.size} pending", color = SharkSecondary, fontSize = 11.sp)
+                    Text("UPCOMING", style = SharkTypography.labelSmall, color = SharkSecondary)
+                    Text("$${String.format("%.2f", metrics.totalUnpaid)}", color = SharkAmber, style = SharkTypography.headlineMedium)
+                    Text("${metrics.unpaidCount} pending", style = SharkTypography.labelSmall, color = SharkSecondary)
                 }
-            }
-
-            if (showProjectedCoach) {
-                CoachMark(
-                    text = "Shark predicts your balance after all bills are paid.",
-                    modifier = Modifier.align(Alignment.BottomStart).offset(y = 50.dp),
-                    onDismiss = { showProjectedCoach = false }
-                )
             }
         }
 
         Spacer(Modifier.height(32.dp))
         
-        // Using the shared BillCalendar from SharedComponents.kt
         BillCalendar(
             bills = bills,
             viewMonth = viewMonth,
@@ -208,33 +189,22 @@ fun BillTrackerScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             val sortedBills = bills.sortedWith(compareBy({ it.isPaid }, { it.dayOfMonth }))
-            items(sortedBills) { bill ->
-                Box {
-                    BillRowItem(
-                        bill = bill,
-                        uid = uid,
-                        db = db,
-                        onClick = { selectedBill = bill }
-                    )
-                    
-                    if (showPayCoach && !bill.isPaid && sortedBills.indexOf(bill) == 0) {
-                        CoachMark(
-                            text = "Tap 'PAY' to log a payment and update your cash.",
-                            modifier = Modifier.align(Alignment.CenterEnd).offset(x = (-60).dp, y = 30.dp),
-                            onDismiss = { showPayCoach = false }
-                        )
-                    }
-                }
+            items(sortedBills, key = { it.id }) { bill ->
+                BillRowItem(
+                    bill = bill,
+                    uid = uid,
+                    db = db,
+                    onClick = { selectedBill = bill }
+                )
             }
             
             if (bills.isEmpty()) {
                 item {
                     Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.AutoMirrored.Filled.ReceiptLong, null, tint = SharkSecondary, modifier = Modifier.size(48.dp))
+                            Icon(Icons.AutoMirrored.Filled.ReceiptLong, null, tint = SharkSecondary.copy(0.4f), modifier = Modifier.size(48.dp))
                             Spacer(Modifier.height(12.dp))
-                            Text("No bills yet", color = SharkSecondary, fontSize = 16.sp)
-                            Text("Log recurring costs to see projections", color = SharkSecondary.copy(alpha = 0.6f), fontSize = 12.sp)
+                            Text("No bills tracked", style = SharkTypography.bodyMedium, color = SharkSecondary)
                         }
                     }
                 }
@@ -254,12 +224,14 @@ fun BillTrackerScreen(
 @Composable
 fun BillRowItem(bill: Bill, uid: String, db: FirebaseFirestore, onClick: () -> Unit) {
     val scope = rememberCoroutineScope()
-    val category = billCategories.find { it.name == bill.category } ?: billCategories.last()
+    val category = remember(bill.category) { billCategories.find { it.name == bill.category } ?: billCategories.last() }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .glassCard(alpha = if (bill.isPaid) 0.03f else 0.07f)
+            .background(SharkSurface, RoundedCornerShape(16.dp))
+            .border(0.5.dp, SharkCardBorder, RoundedCornerShape(16.dp))
+            .alpha(if (bill.isPaid) 0.6f else 1f)
             .clickable { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -276,12 +248,12 @@ fun BillRowItem(bill: Bill, uid: String, db: FirebaseFirestore, onClick: () -> U
         Spacer(Modifier.width(16.dp))
 
         Column(Modifier.weight(1f)) {
-            Text(bill.name, color = if (bill.isPaid) SharkSecondary else SharkLabel, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Text("Due: ${ordinal(bill.dayOfMonth)} · ${bill.recurrence}", color = SharkSecondary, fontSize = 12.sp)
+            Text(bill.name, color = SharkLabel, style = SharkTypography.bodyLarge.copy(fontWeight = FontWeight.Bold))
+            Text("Due: ${ordinal(bill.dayOfMonth)} · ${bill.recurrence}", style = SharkTypography.labelMedium, color = SharkSecondary)
         }
 
         Column(horizontalAlignment = Alignment.End) {
-            Text("$${String.format("%.0f", bill.amount)}", color = if (bill.isPaid) SharkSecondary else SharkLabel, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text("$${String.format("%.0f", bill.amount)}", color = SharkLabel, style = SharkTypography.bodyLarge.copy(fontWeight = FontWeight.Bold))
             Spacer(Modifier.height(4.dp))
             Box(
                 modifier = Modifier
@@ -295,7 +267,6 @@ fun BillRowItem(bill: Bill, uid: String, db: FirebaseFirestore, onClick: () -> U
                                 .update("isPaid", nextPaid)
                             
                             if (nextPaid) {
-                                // Log as expense to update balance
                                 val expenseData = hashMapOf(
                                     "title" to bill.name,
                                     "amount" to bill.amount,
@@ -312,8 +283,7 @@ fun BillRowItem(bill: Bill, uid: String, db: FirebaseFirestore, onClick: () -> U
                 Text(
                     if (bill.isPaid) "PAID" else "PAY",
                     color = if (bill.isPaid) SharkGold else SharkAmber,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
+                    style = SharkTypography.labelSmall
                 )
             }
         }
@@ -328,7 +298,6 @@ fun AddBillSheet(uid: String, db: FirebaseFirestore, onDismiss: () -> Unit) {
     var day by remember { mutableStateOf("1") }
     var selectedCategory by remember { mutableStateOf(billCategories.first().name) }
     var recurrence by remember { mutableStateOf("Monthly") }
-    val scope = rememberCoroutineScope()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -338,16 +307,18 @@ fun AddBillSheet(uid: String, db: FirebaseFirestore, onDismiss: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
+                .padding(24.dp)
+                .navigationBarsPadding()
+                .imePadding(),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Text("Add New Bill", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = SharkLabel)
+            Text("Add New Bill", style = SharkTypography.headlineMedium, color = SharkLabel)
 
             SheetInputField(name, { name = it }, "BILL NAME", "e.g. Rent, Electric")
             SheetInputField(amount, { amount = it }, "AMOUNT", "0.00", KeyboardType.Decimal)
             SheetInputField(day, { day = it }, "DUE DAY (1-31)", "1", KeyboardType.Number)
 
-            Text("CATEGORY", color = SharkSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text("CATEGORY", style = SharkTypography.labelSmall, color = SharkSecondary)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 billCategories.take(4).forEach { cat ->
                     CategoryPill(cat.name, selectedCategory == cat.name) { selectedCategory = cat.name }
@@ -367,10 +338,10 @@ fun AddBillSheet(uid: String, db: FirebaseFirestore, onDismiss: () -> Unit) {
                     db.collection("users").document(uid).collection("bills").add(bill).addOnSuccessListener { onDismiss() }
                 },
                 modifier = Modifier.fillMaxWidth().height(54.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SharkGold),
+                colors = ButtonDefaults.buttonColors(containerColor = SharkGold, contentColor = SharkBg),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Text("Save Bill", color = SharkBg, fontWeight = FontWeight.Bold)
+                Text("Save Bill", fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.height(20.dp))
         }
@@ -382,12 +353,12 @@ fun CategoryPill(name: String, isSelected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(if (isSelected) SharkGold.copy(alpha = 0.15f) else SharkSurface)
-            .border(1.dp, if (isSelected) SharkGold else SharkCardBorder, RoundedCornerShape(12.dp))
+            .background(if (isSelected) SharkGold.copy(alpha = 0.15f) else SharkBg.copy(0.3f))
+            .border(0.5.dp, if (isSelected) SharkGold else SharkCardBorder, RoundedCornerShape(12.dp))
             .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Text(name, color = if (isSelected) SharkGold else SharkSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Text(name, color = if (isSelected) SharkGold else SharkSecondary, style = SharkTypography.labelMedium)
     }
 }
 
@@ -398,17 +369,16 @@ fun BillDetailSheet(bill: Bill, uid: String, db: FirebaseFirestore, onDismiss: (
     var amount by remember { mutableStateOf(bill.amount.toString()) }
     var day by remember { mutableStateOf(bill.dayOfMonth.toString()) }
     var selectedCategory by remember { mutableStateOf(bill.category) }
-    val scope = rememberCoroutineScope()
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = SharkSurface) {
-        Column(modifier = Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Edit Bill", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SharkLabel)
+        Column(modifier = Modifier.fillMaxWidth().padding(24.dp).navigationBarsPadding().imePadding(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Edit Bill", style = SharkTypography.headlineMedium, color = SharkLabel)
             
             SheetInputField(name, { name = it }, "BILL NAME", "e.g. Rent")
             SheetInputField(amount, { amount = it }, "AMOUNT", "0.00", KeyboardType.Decimal)
             SheetInputField(day, { day = it }, "DUE DAY (1-31)", "1", KeyboardType.Number)
 
-            Text("CATEGORY", color = SharkSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text("CATEGORY", style = SharkTypography.labelSmall, color = SharkSecondary)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 billCategories.take(4).forEach { cat ->
                     CategoryPill(cat.name, selectedCategory == cat.name) { selectedCategory = cat.name }
@@ -429,78 +399,22 @@ fun BillDetailSheet(bill: Bill, uid: String, db: FirebaseFirestore, onDismiss: (
                         )).addOnSuccessListener { onDismiss() }
                 },
                 modifier = Modifier.fillMaxWidth().height(54.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SharkGold),
+                colors = ButtonDefaults.buttonColors(containerColor = SharkGold, contentColor = SharkBg),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Text("Update Bill", color = SharkBg, fontWeight = FontWeight.Bold)
+                Text("Update Bill", fontWeight = FontWeight.Bold)
             }
 
-            Button(
+            TextButton(
                 onClick = {
                     db.collection("users").document(uid).collection("bills").document(bill.id).delete()
                     onDismiss()
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = SharkRed.copy(alpha = 0.1f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Delete Bill", color = SharkRed)
+                Text("Delete Bill", color = SharkRed, style = SharkTypography.labelMedium)
             }
             Spacer(Modifier.height(40.dp))
-        }
-    }
-}
-
-fun markBillPaidByKey(
-    uid        : String,
-    db         : FirebaseFirestore,
-    recurringKey: String,
-    bills      : List<Bill>
-) {
-    // Find the bill that matches the recurring key by name
-    val keyToNameMap = mapOf(
-        "rent"     to "Rent",
-        "car_note" to listOf("Car Note", "Car Payment", "Car Loan"),
-        "light"    to listOf("Light", "Electric", "Light Bill"),
-        "water"    to listOf("Water", "Water Bill"),
-        "gas_bill" to listOf("Gas Bill", "Gas"),
-        "internet" to listOf("Internet", "WiFi", "Wi-Fi"),
-        "phone"    to listOf("Phone", "Phone Bill"),
-        "netflix"  to listOf("Netflix"),
-        "spotify"  to listOf("Spotify"),
-        "apple"    to listOf("Apple"),
-        "car_ins"  to listOf("Car Insurance", "Insurance"),
-        "court"    to listOf("Court", "Court Payment"),
-        "probation" to listOf("Probation", "Probation Fee"),
-        "gas_car"  to listOf("Gas", "Fill Up")
-    )
-
-    val possibleNames = keyToNameMap[recurringKey]
-    val matchedBill = bills.firstOrNull { bill ->
-        when (possibleNames) {
-            is String -> bill.name.equals(possibleNames, ignoreCase = true)
-            is List<*> -> possibleNames.any { name ->
-                bill.name.equals(name as String, ignoreCase = true)
-            }
-            else -> false
-        }
-    }
-
-    matchedBill?.let { bill ->
-        if (!bill.isPaid) {
-            db.collection("users").document(uid)
-                .collection("bills")
-                .document(bill.id)
-                .update("isPaid", true)
-
-            // Log as expense to update balance
-            val expenseData = hashMapOf(
-                "title" to bill.name,
-                "amount" to bill.amount,
-                "category" to bill.category,
-                "note" to "Paid via Shark command",
-                "createdAt" to java.util.Date()
-            )
-            db.collection("users").document(uid).collection("expenses").add(expenseData)
         }
     }
 }

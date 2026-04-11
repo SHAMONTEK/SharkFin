@@ -30,3 +30,10 @@ val SharkPositive      = Color(0xFF4CAF82)   // Income, gains
 val SharkNegative      = Color(0xFFE05C5C)   // Expenses, losses
 val SharkWarning       = Color(0xFFE8944B)   // Bills, alerts
 val SharkInfo          = Color(0xFF4BA3E8)   // Informational
+
+// ── EXTENDED PALETTE ──────────────────────────────────────
+val SharkRed           = Color(0xFFE05C5C)
+val SharkAmber         = Color(0xFFE8944B)
+val SharkTeal          = Color(0xFF4BA3E8)
+val SharkPurple        = Color(0xFFAF52DE)
+val SharkWhite         = Color(0xFFFFFFFF)

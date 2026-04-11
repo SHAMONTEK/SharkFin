@@ -37,42 +37,35 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 
 // ─── Auth Mode ─────────────────────────────────────────────────────────────
-// Two states: are we logging in or signing up?
 enum class AuthMode { LOGIN, SIGNUP }
 
-// ─── Account Types ─────────────────────────────────────────────────────────
-// The four account types a new user can pick from
 val accountTypes = listOf("Individual", "Joint", "Family", "Business")
 
-// ─── Main AuthScreen ───────────────────────────────────────────────────────
-// This is the whole login/signup screen — one screen, no duplicates
 @Composable
 fun AuthScreen(
     onLogin: (String, String) -> Unit,
-    // Now signup also passes accountType to MainActivity
     onSignup: (String, String, String, String) -> Unit
 ) {
-    // Track which mode we're in
     var authMode by remember { mutableStateOf(AuthMode.LOGIN) }
-
-    // Form field states
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
-
-    // Account type dropdown state
     var selectedAccountType by remember { mutableStateOf("Individual") }
     var dropdownExpanded by remember { mutableStateOf(false) }
 
     val haptic = LocalHapticFeedback.current
 
-    // Dark green → black gradient background (same vibe as before)
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(SharkBg)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(SharkBg, SharkSurface),
+                    startY = 0f,
+                    endY = 1000f
+                )
+            )
     ) {
-
         // ── TOP BRANDING SECTION ──────────────────────────────────────────
         Column(
             modifier = Modifier
@@ -81,7 +74,6 @@ fun AuthScreen(
                 .padding(top = 64.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Logo from drawable folder
             AsyncImage(
                 model = R.drawable.sharkfinlogo,
                 contentDescription = "SharkFin Logo",
@@ -91,33 +83,30 @@ fun AuthScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Fixed: "SharkFin" instead of "alamUI" — because this is SharkFin lol
             Row {
                 Text(
                     text = "Shark",
-                    color = Color.White,
+                    color = SharkLabel,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Light
                 )
                 Text(
                     text = "Fin",
-                    color = Color.White,
+                    color = SharkGold,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
 
             Text(
-                text = "Financial Growth",
-                color = SharkGold,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
+                text = "FINANCIAL GROWTH",
+                color = SharkSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
                 letterSpacing = 2.sp
             )
         }
 
-        // ── KEYBOARD SLIDE ANIMATION ─────────────────────────────────────
-        // When the keyboard pops up, the card slides up so nothing is hidden
         val imeInsets = WindowInsets.ime
         val keyboardHeight = imeInsets.getBottom(LocalDensity.current)
         val translationY by animateFloatAsState(
@@ -125,20 +114,19 @@ fun AuthScreen(
             animationSpec = spring(
                 dampingRatio = Spring.DampingRatioLowBouncy,
                 stiffness = Spring.StiffnessLow
-            )
+            ), label = "keyboard_slide"
         )
 
         // ── BOTTOM CARD ───────────────────────────────────────────────────
-        // The frosted glass card that holds all the form inputs
         Surface(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .graphicsLayer { this.translationY = translationY }
                 .clip(RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp)),
-            color = SharkSurface
+            color = SharkSurface.copy(alpha = 0.95f),
+            tonalElevation = 8.dp
         ) {
-            // scrollable so nothing gets cut off when signup fields are showing
             Column(
                 modifier = Modifier
                     .verticalScroll(rememberScrollState())
@@ -147,8 +135,6 @@ fun AuthScreen(
                     .imePadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-
-                // ── LOGIN / SIGNUP TOGGLE SLIDER ──────────────────────────
                 AuthSlider(
                     selectedMode = authMode,
                     onModeChange = {
@@ -159,11 +145,7 @@ fun AuthScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // ── SIGNUP-ONLY FIELDS ────────────────────────────────────
-                // These only show when the user switches to Sign Up mode
                 if (authMode == AuthMode.SIGNUP) {
-
-                    // Full Name bubble
                     AuthInputField(
                         value = name,
                         onValueChange = { name = it },
@@ -173,16 +155,11 @@ fun AuthScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // ── ACCOUNT TYPE DROPDOWN ─────────────────────────────
-                    // Styled to match the other bubbles
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, SharkCardBorder, RoundedCornerShape(20.dp))
-                            .background(
-                                SharkBg,
-                                RoundedCornerShape(20.dp)
-                            )
+                            .border(0.5.dp, SharkCardBorder, RoundedCornerShape(20.dp))
+                            .background(SharkBg.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
                             .clickable { dropdownExpanded = true }
                             .padding(horizontal = 16.dp, vertical = 18.dp)
                     ) {
@@ -191,27 +168,23 @@ fun AuthScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Show the currently selected account type
                             Text(
                                 text = "$selectedAccountType Account",
-                                color = Color.White,
+                                color = SharkLabel,
                                 fontSize = 16.sp
                             )
-                            // Dropdown arrow icon
                             Icon(
                                 Icons.Default.ArrowDropDown,
                                 contentDescription = "Select Account Type",
-                                tint = Color.White.copy(alpha = 0.4f)
+                                tint = SharkGold
                             )
                         }
 
-                        // The actual dropdown menu that pops up
                         DropdownMenu(
                             expanded = dropdownExpanded,
                             onDismissRequest = { dropdownExpanded = false },
-                            modifier = Modifier.background(SharkSurface).border(1.dp, SharkCardBorder)
+                            modifier = Modifier.background(SharkSurface).border(0.5.dp, SharkCardBorder)
                         ) {
-                            // Loop through all 4 account types and show each as an option
                             accountTypes.forEach { type ->
                                 DropdownMenuItem(
                                     text = {
@@ -221,8 +194,8 @@ fun AuthScreen(
                                         )
                                     },
                                     onClick = {
-                                        selectedAccountType = type   // update selection
-                                        dropdownExpanded = false      // close the menu
+                                        selectedAccountType = type
+                                        dropdownExpanded = false
                                     }
                                 )
                             }
@@ -232,9 +205,6 @@ fun AuthScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                // ── SHARED FIELDS (both Login and Signup) ─────────────────
-
-                // Email bubble
                 AuthInputField(
                     value = email,
                     onValueChange = { email = it },
@@ -244,7 +214,6 @@ fun AuthScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Password bubble
                 AuthInputField(
                     value = password,
                     onValueChange = { password = it },
@@ -255,28 +224,29 @@ fun AuthScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // ── SUBMIT BUTTON ─────────────────────────────────────────
                 Button(
                     onClick = {
                         if (authMode == AuthMode.LOGIN) {
-                            // Login: just needs email + password
                             onLogin(email, password)
                         } else {
-                            // Signup: passes name, email, password, AND account type
                             onSignup(name, email, password, selectedAccountType.uppercase())
                         }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(56.dp)
+                        .graphicsLayer {
+                            // Simple subtle scale effect on interaction could be added here
+                        },
                     shape = RoundedCornerShape(20.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = SharkGold
-                    )
+                        containerColor = SharkGold,
+                        contentColor = SharkBg
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp, pressedElevation = 0.dp)
                 ) {
                     Text(
                         text = if (authMode == AuthMode.LOGIN) "Access Account" else "Create Portfolio",
-                        color = SharkBg,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp
                     )
@@ -284,7 +254,6 @@ fun AuthScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Small hint text at the bottom
                 Text(
                     text = if (authMode == AuthMode.LOGIN)
                         "Secure biometric login enabled"
@@ -298,14 +267,11 @@ fun AuthScreen(
     }
 }
 
-// ─── Auth Slider (Login / Sign Up toggle) ──────────────────────────────────
-// The pill that slides left and right between Login and Sign Up
 @Composable
 fun AuthSlider(
     selectedMode: AuthMode,
     onModeChange: (AuthMode) -> Unit
 ) {
-    // Animate the green pill sliding left (login) or right (signup)
     val transition = updateTransition(targetState = selectedMode, label = "AuthSlider")
     val offsetX by transition.animateDp(label = "pillOffset") { mode ->
         if (mode == AuthMode.LOGIN) 0.dp else 140.dp
@@ -315,21 +281,19 @@ fun AuthSlider(
         modifier = Modifier
             .width(280.dp)
             .height(48.dp)
-            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(24.dp))
+            .background(SharkBg.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+            .border(0.5.dp, SharkCardBorder, RoundedCornerShape(24.dp))
             .padding(4.dp)
     ) {
-        // The sliding green pill behind the text
         Box(
             modifier = Modifier
                 .offset(x = offsetX)
                 .width(136.dp)
                 .fillMaxHeight()
-                .background(Color(0xFF10b981), RoundedCornerShape(20.dp))
+                .background(SharkGold, RoundedCornerShape(20.dp))
         )
 
-        // The two tappable labels on top of the pill
         Row(modifier = Modifier.fillMaxSize()) {
-            // Log In tap target
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -339,11 +303,10 @@ fun AuthSlider(
             ) {
                 Text(
                     "Log In",
-                    color = if (selectedMode == AuthMode.LOGIN) Color.Black else Color.White,
+                    color = if (selectedMode == AuthMode.LOGIN) SharkBg else SharkSecondary,
                     fontWeight = FontWeight.Bold
                 )
             }
-            // Sign Up tap target
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -353,7 +316,7 @@ fun AuthSlider(
             ) {
                 Text(
                     "Sign Up",
-                    color = if (selectedMode == AuthMode.SIGNUP) Color.Black else Color.White,
+                    color = if (selectedMode == AuthMode.SIGNUP) SharkBg else SharkSecondary,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -361,8 +324,6 @@ fun AuthSlider(
     }
 }
 
-// ─── Reusable Input Field ───────────────────────────────────────────────────
-// The bubbly text input used for name, email, and password
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthInputField(
@@ -370,46 +331,42 @@ fun AuthInputField(
     onValueChange: (String) -> Unit,
     hint: String,
     icon: ImageVector,
-    isPassword: Boolean = false   // if true, hides the text with dots
+    isPassword: Boolean = false
 ) {
     TextField(
         value = value,
         onValueChange = onValueChange,
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(20.dp)),
+            .border(0.5.dp, SharkCardBorder, RoundedCornerShape(20.dp)),
         placeholder = {
-            Text(hint, color = Color.White.copy(alpha = 0.4f))
+            Text(hint, color = SharkTertiary)
         },
         leadingIcon = {
             Icon(
                 icon,
                 contentDescription = null,
-                modifier = Modifier
-                    .size(20.dp)
-                    .alpha(0.4f),
-                tint = Color.White
+                modifier = Modifier.size(20.dp),
+                tint = SharkGold.copy(alpha = 0.7f)
             )
         },
-        // Hide text if it's a password field
         visualTransformation = if (isPassword)
             PasswordVisualTransformation()
         else
             androidx.compose.ui.text.input.VisualTransformation.None,
-        // Show number pad for password, default keyboard for everything else
         keyboardOptions = if (isPassword)
             KeyboardOptions(keyboardType = KeyboardType.Password)
         else
             KeyboardOptions.Default,
         colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color.White.copy(alpha = 0.05f),
-            unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
-            focusedIndicatorColor = Color.Transparent,      // removes the underline
-            unfocusedIndicatorColor = Color.Transparent,    // removes the underline
+            focusedContainerColor = SharkBg.copy(alpha = 0.5f),
+            unfocusedContainerColor = SharkBg.copy(alpha = 0.3f),
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
             disabledIndicatorColor = Color.Transparent,
-            focusedTextColor = Color.White,
-            unfocusedTextColor = Color.White
+            focusedTextColor = SharkLabel,
+            unfocusedTextColor = SharkLabel
         ),
-        shape = RoundedCornerShape(20.dp)   // the bubble shape
+        shape = RoundedCornerShape(20.dp)
     )
 }

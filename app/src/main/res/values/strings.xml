@@ -1,24 +1,4 @@
 <resources>
-    <string name="app_name">Sharkfin</string>
-    <string name="join_the_pod">Join the Pod</string>
-    <string name="your_name">Your Name</string>
-    <string name="email_address">Email Address</string>
-    <string name="phone_number">Phone Number</string>
-    <string name="account_type">Account Type</string>
-    <string name="secure_password">Secure Password</string>
-    <string name="start_my_journey">START MY JOURNEY</string>
-    <string name="part_of_the_pod">Part of the pod? Sign in here</string>
+    <string name="app_name">SharkFin</string>
     <string name="logo_description">SharkFin Logo</string>
-    <string name="role_in_joint">Role in Joint Account</string>
-    <string-array name="account_types">
-        <item>Individual Account</item>
-        <item>Joint Account</item>
-        <item>Business Account</item>
-        <item>Investor Account</item>
-    </string-array>
-    <string-array name="joint_roles">
-        <item>Primary Partner</item>
-        <item>Secondary Partner</item>
-        <item>Dependent</item>
-    </string-array>
 </resources>

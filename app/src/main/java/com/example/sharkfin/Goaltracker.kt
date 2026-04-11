@@ -1,7 +1,7 @@
 package com.example.sharkfin
 
-// ─── Imports ───────────────────────────────────────────────────────────────
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,18 +23,16 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.Canvas
+import com.example.sharkfin.ui.theme.*
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
-// ─── Goal Tracker Screen ───────────────────────────────────────────────────
+
 @Composable
 fun GoalTrackerScreen(
     uid: String,
@@ -45,152 +43,119 @@ fun GoalTrackerScreen(
     var showAddGoal   by remember { mutableStateOf(false) }
     var selectedGoal  by remember { mutableStateOf<Goal?>(null) }
 
-    // Coach marks state
-    var showSurplusCoach by remember { mutableStateOf(false) }
-    var showPaceCoach by remember { mutableStateOf(false) }
+    // Optimized Calculations
+    val metrics = remember(goals, expenses) {
+        val totalTargeted  = goals.sumOf { it.targetAmount }
+        val totalSaved     = goals.sumOf { it.savedAmount }
+        val completedCount = goals.count { it.isCompleted }
 
-    LaunchedEffect(Unit) {
-        delay(1000)
-        showSurplusCoach = true
-        delay(2000)
-        if (goals.isNotEmpty()) showPaceCoach = true
+        val monthlyIncome  = expenses.filter { SharkIncomeCategories.contains(it.category) }.sumOf { it.amount }
+        val monthlySpend   = expenses.filter { !SharkIncomeCategories.contains(it.category) }.sumOf { it.amount }
+        val monthlySurplus = (monthlyIncome - monthlySpend).coerceAtLeast(0.0)
+        
+        object {
+            val targeted = totalTargeted
+            val saved = totalSaved
+            val completed = completedCount
+            val surplus = monthlySurplus
+        }
     }
-
-    // ── DERIVED STATS ─────────────────────────────────────────────────────
-    val totalTargeted  = goals.sumOf { it.targetAmount }
-    val totalSaved     = goals.sumOf { it.savedAmount }
-    val completedCount = goals.count { it.isCompleted }
-
-    val monthlyIncome  = expenses.filter { it.category == "Income" }.sumOf { it.amount }
-    val monthlySpend   = expenses.filter { it.category != "Income" }.sumOf { it.amount }
-    val monthlySurplus = (monthlyIncome - monthlySpend).coerceAtLeast(0.0)
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(SharkBg)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
     ) {
         Spacer(modifier = Modifier.height(56.dp))
 
-        // ── HEADER ────────────────────────────────────────────────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("Goal Tracker", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                Text("${goals.size} goals · $completedCount completed", color = SharkMuted, fontSize = 13.sp)
+                Text("Goal Tracker", style = SharkTypography.headlineLarge, color = SharkLabel)
+                Text("${goals.size} goals · ${metrics.completed} completed", style = SharkTypography.labelMedium, color = SharkSecondary)
             }
-            Box(
+            IconButton(
+                onClick = { showAddGoal = true },
                 modifier = Modifier
-                    .size(44.dp)
-                    .background(SharkNavy, CircleShape)
-                    .clickable { showAddGoal = true },
-                contentAlignment = Alignment.Center
+                    .clip(CircleShape)
+                    .background(SharkGold.copy(alpha = 0.1f))
             ) {
-                Icon(Icons.Default.Add, "Add Goal", tint = Color.White, modifier = Modifier.size(22.dp))
+                Icon(Icons.Default.Add, null, tint = SharkGold)
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // ── SUMMARY CARD ──────────────────────────────────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(SharkSurfaceHigh, SharkSurface)
-                    )
-                )
-                .padding(24.dp)
-        ) {
+        SharkCard {
             Column {
-                Text("Total Progress", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+                Text("TOTAL PROGRESS", style = SharkTypography.labelSmall, color = SharkSecondary)
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    "\$${String.format("%.2f", totalSaved)}",
-                    color = Color.White,
-                    fontSize = 36.sp,
-                    fontWeight = FontWeight.Bold
+                    "$${String.format(Locale.US, "%,.2f", metrics.saved)}",
+                    style = SharkTypography.displayLarge.copy(fontSize = 32.sp),
+                    color = SharkLabel
                 )
                 Text(
-                    "of \$${String.format("%.2f", totalTargeted)} targeted",
-                    color = SharkMuted,
-                    fontSize = 12.sp
+                    "of $${String.format(Locale.US, "%,.2f", metrics.targeted)} targeted",
+                    style = SharkTypography.labelSmall,
+                    color = SharkSecondary
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                val overallFraction = if (totalTargeted > 0) (totalSaved / totalTargeted).toFloat().coerceIn(0f, 1f) else 0f
-                GoalProgressBar(fraction = overallFraction, color = SharkNavy, height = 8)
+                val overallFraction = if (metrics.targeted > 0) (metrics.saved / metrics.targeted).toFloat().coerceIn(0f, 1f) else 0f
+                GoalProgressBar(fraction = overallFraction, color = SharkGold, height = 8)
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    MiniStat("Saved",     "+\$${String.format("%.0f", totalSaved)}",    positive = true)
-                    MiniStat("Remaining", "-\$${String.format("%.0f", (totalTargeted - totalSaved).coerceAtLeast(0.0))}", positive = false)
+                    MiniStat("Saved", "$${String.format(Locale.US, "%,.0f", metrics.saved)}", positive = true)
+                    MiniStat("Remaining", "$${String.format(Locale.US, "%,.0f", (metrics.targeted - metrics.saved).coerceAtLeast(0.0))}", positive = false)
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // ── FREE CASH PILL ───────────────────────────────────────────────
-        if (monthlySurplus > 0) {
+        if (metrics.surplus > 0) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(SharkPositive.copy(alpha = 0.05f))
+                    .border(0.5.dp, SharkPositive.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(SharkNavy.copy(alpha = 0.08f))
-                        .border(1.dp, SharkNavy.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.AutoMirrored.Filled.TrendingUp, null, tint = SharkNavy, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            "You have \$${String.format("%.0f", monthlySurplus)}/mo 'Free Cash' to save",
-                            color = SharkNavy,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-                
-                if (showSurplusCoach) {
-                    CoachMark(
-                        text = "This is your 'Free Cash' after bills and spending. Use it to hit goals faster!",
-                        modifier = Modifier.align(Alignment.BottomCenter).offset(y = 45.dp),
-                        onDismiss = { showSurplusCoach = false }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.AutoMirrored.Filled.TrendingUp, null, tint = SharkPositive, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        "You have $${String.format(Locale.US, "%,.0f", metrics.surplus)}/mo 'Free Cash' to save",
+                        color = SharkPositive,
+                        style = SharkTypography.labelMedium.copy(fontWeight = FontWeight.Bold)
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(30.dp))
+            Spacer(modifier = Modifier.height(20.dp))
         }
 
-        // ── GOAL CARDS ────────────────────────────────────────────────────
         if (goals.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
-                    .glassCard(alpha = 0.05f),
+                    .height(200.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Flag, null, tint = SharkMuted, modifier = Modifier.size(48.dp))
+                    Icon(Icons.Default.Flag, null, tint = SharkSecondary.copy(0.4f), modifier = Modifier.size(48.dp))
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("No goals yet", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    Text("Tap + to set your first goal", color = SharkMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                    Text("No goals yet", style = SharkTypography.bodyMedium, color = SharkSecondary)
                 }
             }
         } else {
@@ -198,36 +163,24 @@ fun GoalTrackerScreen(
             val completedGoals = goals.filter { it.isCompleted }
 
             if (activeGoals.isNotEmpty()) {
-                Text("Active", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(modifier = Modifier.height(10.dp))
-                activeGoals.forEachIndexed { index, goal ->
-                    Box {
-                        GoalCard(
-                            goal           = goal,
-                            monthlySurplus = monthlySurplus,
-                            onClick        = { selectedGoal = goal }
-                        )
-                        
-                        if (showPaceCoach && index == 0) {
-                            CoachMark(
-                                text = "Shark checks if your 'Free Cash' can hit the goal by its deadline.",
-                                modifier = Modifier.align(Alignment.TopEnd).offset(x = (-20).dp, y = 30.dp),
-                                onDismiss = { showPaceCoach = false }
-                            )
-                        }
-                    }
+                SharkSectionHeader("ACTIVE")
+                activeGoals.forEach { goal ->
+                    GoalCard(
+                        goal           = goal,
+                        monthlySurplus = metrics.surplus,
+                        onClick        = { selectedGoal = goal }
+                    )
                     Spacer(modifier = Modifier.height(12.dp))
                 }
             }
 
             if (completedGoals.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Completed", color = SharkMuted, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(modifier = Modifier.height(10.dp))
+                SharkSectionHeader("COMPLETED")
                 completedGoals.forEach { goal ->
                     GoalCard(
                         goal           = goal,
-                        monthlySurplus = monthlySurplus,
+                        monthlySurplus = metrics.surplus,
                         onClick        = { selectedGoal = goal }
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -252,55 +205,40 @@ fun GoalTrackerScreen(
     }
 }
 
-// ─── Goal Card ─────────────────────────────────────────────────────────────
 @Composable
 fun GoalCard(
     goal: Goal,
     monthlySurplus: Double,
     onClick: () -> Unit
 ) {
-    val category   = goalCategories.find { it.name == goal.category } ?: goalCategories.last()
-    val fraction   = if (goal.targetAmount > 0) (goal.savedAmount / goal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
+    val category   = remember(goal.category) { goalCategories.find { it.name == goal.category } ?: goalCategories.last() }
+    val fraction   = remember(goal.savedAmount, goal.targetAmount) { if (goal.targetAmount > 0) (goal.savedAmount / goal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f }
     val remaining  = (goal.targetAmount - goal.savedAmount).coerceAtLeast(0.0)
 
-    val deadlineText: String
-    val onPace: Boolean?
+    val paceData = remember(goal.deadline, monthlySurplus, remaining) {
+        if (goal.deadline.isNotEmpty()) {
+            val sdf = SimpleDateFormat("MM/dd/yyyy", Locale.getDefault())
+            val deadlineDate = try { sdf.parse(goal.deadline) } catch (e: Exception) { null }
 
-    if (goal.deadline.isNotEmpty()) {
-        val sdf = SimpleDateFormat("MM/dd/yyyy", Locale.getDefault())
-        val deadlineDate = try { sdf.parse(goal.deadline) } catch (e: Exception) { null }
+            if (deadlineDate != null) {
+                val today        = Calendar.getInstance()
+                val deadlineCal  = Calendar.getInstance().apply { time = deadlineDate }
+                val monthsLeft   = ((deadlineCal.get(Calendar.YEAR) - today.get(Calendar.YEAR)) * 12 +
+                        (deadlineCal.get(Calendar.MONTH) - today.get(Calendar.MONTH))).coerceAtLeast(0)
 
-        if (deadlineDate != null) {
-            val today        = Calendar.getInstance()
-            val deadlineCal  = Calendar.getInstance().apply { time = deadlineDate }
-            val monthsLeft   = ((deadlineCal.get(Calendar.YEAR) - today.get(Calendar.YEAR)) * 12 +
-                    (deadlineCal.get(Calendar.MONTH) - today.get(Calendar.MONTH))).coerceAtLeast(0)
-
-            deadlineText = when {
-                monthsLeft == 0  -> "Due this month"
-                monthsLeft == 1  -> "1 month left"
-                else             -> "$monthsLeft months left"
-            }
-
-            onPace = monthlySurplus > 0 && (monthlySurplus * monthsLeft) >= remaining
-        } else {
-            deadlineText = ""
-            onPace = null
-        }
-    } else {
-        deadlineText = "No deadline"
-        onPace = null
+                val text = when {
+                    monthsLeft == 0  -> "Due this month"
+                    monthsLeft == 1  -> "1 month left"
+                    else             -> "$monthsLeft months left"
+                }
+                val onPace = monthlySurplus > 0 && (monthlySurplus * monthsLeft) >= remaining
+                text to onPace
+            } else "" to null
+        } else "No deadline" to null
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassCard(
-                cornerRadius = 20f,
-                alpha = if (goal.isCompleted) 0.04f else 0.08f
-            )
-            .clickable { onClick() }
-            .padding(18.dp)
+    SharkCard(
+        modifier = Modifier.clickable { onClick() }
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -309,16 +247,13 @@ fun GoalCard(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .background(
-                        category.color.copy(alpha = if (goal.isCompleted) 0.08f else 0.15f),
-                        CircleShape
-                    ),
+                    .background(category.color.copy(alpha = 0.1f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     if (goal.isCompleted) Icons.Default.CheckCircle else category.icon,
                     null,
-                    tint = if (goal.isCompleted) SharkNavy else category.color,
+                    tint = if (goal.isCompleted) SharkPositive else category.color,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -328,53 +263,47 @@ fun GoalCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     goal.name,
-                    color = if (goal.isCompleted) SharkMuted else Color.White,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
+                    color = SharkLabel,
+                    style = SharkTypography.bodyLarge.copy(fontWeight = FontWeight.Bold)
                 )
                 Text(
                     goal.category,
-                    color = SharkMuted,
-                    fontSize = 11.sp
+                    color = SharkSecondary,
+                    style = SharkTypography.labelSmall
                 )
             }
 
-            if (onPace != null) {
+            if (paceData.second != null) {
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(
-                            if (onPace) SharkNavy.copy(alpha = 0.15f)
-                            else SharkAmber.copy(alpha = 0.15f)
-                        )
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (paceData.second == true) SharkPositive.copy(alpha = 0.1f) else SharkAmber.copy(alpha = 0.1f))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        if (onPace) "On pace ✓" else "Behind ⚠",
-                        color = if (onPace) SharkNavy else SharkAmber,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
+                        if (paceData.second == true) "On pace ✓" else "Behind ⚠",
+                        color = if (paceData.second == true) SharkPositive else SharkAmber,
+                        style = SharkTypography.labelSmall
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                "\$${String.format("%.2f", goal.savedAmount)} saved",
-                color = if (goal.isCompleted) SharkMuted else Color.White,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold
+                "$${String.format(Locale.US, "%,.2f", goal.savedAmount)} saved",
+                color = SharkLabel,
+                style = SharkTypography.labelMedium.copy(fontWeight = FontWeight.Bold)
             )
             Text(
-                "of \$${String.format("%.2f", goal.targetAmount)}",
-                color = SharkMuted,
-                fontSize = 12.sp
+                "of $${String.format(Locale.US, "%,.2f", goal.targetAmount)}",
+                color = SharkSecondary,
+                style = SharkTypography.labelSmall
             )
         }
 
@@ -382,7 +311,7 @@ fun GoalCard(
 
         GoalProgressBar(
             fraction = fraction,
-            color    = if (goal.isCompleted) SharkMuted else category.color,
+            color    = if (goal.isCompleted) SharkPositive else category.color,
             height   = 6
         )
 
@@ -394,12 +323,11 @@ fun GoalCard(
         ) {
             Text(
                 "${(fraction * 100).toInt()}% complete",
-                color = if (goal.isCompleted) SharkMuted else category.color,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
+                color = if (goal.isCompleted) SharkPositive else category.color,
+                style = SharkTypography.labelSmall.copy(fontWeight = FontWeight.Bold)
             )
-            if (deadlineText.isNotEmpty()) {
-                Text(deadlineText, color = SharkMuted, fontSize = 11.sp)
+            if (paceData.first.isNotEmpty()) {
+                Text(paceData.first, color = SharkSecondary, style = SharkTypography.labelSmall)
             }
         }
     }
@@ -417,19 +345,14 @@ fun GoalProgressBar(fraction: Float, color: Color, height: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .height(height.dp)
-            .clip(RoundedCornerShape((height / 2).dp))
-            .background(Color.White.copy(alpha = 0.07f))
+            .clip(CircleShape)
+            .background(SharkSurfaceHigh)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth(animFraction.coerceAtLeast(0f))
                 .fillMaxHeight()
-                .clip(RoundedCornerShape((height / 2).dp))
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(color, color.copy(alpha = 0.6f))
-                    )
-                )
+                .background(color, CircleShape)
         )
     }
 }
@@ -442,8 +365,8 @@ fun GoalDetailSheet(
     db: FirebaseFirestore,
     onDismiss: () -> Unit
 ) {
-    val category   = goalCategories.find { it.name == goal.category } ?: goalCategories.last()
-    val fraction   = if (goal.targetAmount > 0) (goal.savedAmount / goal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
+    val category   = remember(goal.category) { goalCategories.find { it.name == goal.category } ?: goalCategories.last() }
+    val fraction   = remember(goal.savedAmount, goal.targetAmount) { if (goal.targetAmount > 0) (goal.savedAmount / goal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f }
     val remaining  = (goal.targetAmount - goal.savedAmount).coerceAtLeast(0.0)
 
     var addAmount  by remember { mutableStateOf("") }
@@ -451,11 +374,8 @@ fun GoalDetailSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor   = SharkBase,
-        shape            = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
-        dragHandle = {
-            Box(modifier = Modifier.padding(top = 12.dp, bottom = 4.dp).width(40.dp).height(4.dp).background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(2.dp)))
-        }
+        containerColor   = SharkSurface,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = SharkSurfaceHigh) }
     ) {
         Column(
             modifier = Modifier
@@ -470,33 +390,33 @@ fun GoalDetailSheet(
             Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .background(category.color.copy(alpha = 0.15f), CircleShape),
+                    .background(category.color.copy(alpha = 0.1f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(category.icon, null, tint = category.color, modifier = Modifier.size(26.dp))
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            Text(goal.name, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text(goal.category, color = SharkMuted, fontSize = 13.sp)
-            Spacer(modifier = Modifier.height(20.dp))
+            Text(goal.name, style = SharkTypography.headlineMedium, color = SharkLabel)
+            Text(goal.category, style = SharkTypography.labelMedium, color = SharkSecondary)
+            Spacer(modifier = Modifier.height(24.dp))
 
             GoalArc(fraction = fraction, color = category.color)
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            GoalDetailRow("Saved",     "\$${String.format("%.2f", goal.savedAmount)}")
-            GoalDetailRow("Target",    "\$${String.format("%.2f", goal.targetAmount)}")
-            GoalDetailRow("Remaining", "\$${String.format("%.2f", remaining)}")
+            GoalDetailRow("Saved", "$${String.format(Locale.US, "%,.2f", goal.savedAmount)}")
+            GoalDetailRow("Target", "$${String.format(Locale.US, "%,.2f", goal.targetAmount)}")
+            GoalDetailRow("Remaining", "$${String.format(Locale.US, "%,.2f", remaining)}")
             if (goal.deadline.isNotEmpty()) GoalDetailRow("Deadline", goal.deadline)
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             if (!goal.isCompleted) {
                 SheetInputField(
                     value         = addAmount,
                     onValueChange = { addAmount = it },
-                    label         = "Add to savings",
+                    label         = "ADD TO SAVINGS",
                     placeholder   = "0.00",
                     keyboardType  = KeyboardType.Decimal
                 )
@@ -521,16 +441,16 @@ fun GoalDetailSheet(
                                 .addOnFailureListener { isSaving = false }
                         }
                     },
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
                     shape    = RoundedCornerShape(16.dp),
-                    colors   = ButtonDefaults.buttonColors(containerColor = SharkNavy),
+                    colors   = ButtonDefaults.buttonColors(containerColor = SharkGold, contentColor = SharkBg),
                     enabled  = !isSaving
                 ) {
-                    if (isSaving) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    else Text("Add Savings", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    if (isSaving) CircularProgressIndicator(color = SharkBg, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    else Text("Add Savings", fontWeight = FontWeight.Bold)
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 OutlinedButton(
                     onClick = {
@@ -539,32 +459,32 @@ fun GoalDetailSheet(
                             .update("isCompleted", true)
                             .addOnSuccessListener { onDismiss() }
                     },
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
                     shape    = RoundedCornerShape(16.dp),
-                    colors   = ButtonDefaults.outlinedButtonColors(contentColor = SharkNavy),
-                    border   = androidx.compose.foundation.BorderStroke(1.dp, SharkNavy.copy(alpha = 0.4f))
+                    colors   = ButtonDefaults.outlinedButtonColors(contentColor = SharkGold),
+                    border   = androidx.compose.foundation.BorderStroke(1.dp, SharkGold.copy(alpha = 0.3f))
                 ) {
-                    Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Mark as Complete", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text("Mark as Complete", fontWeight = FontWeight.Bold)
                 }
             } else {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(SharkNavy.copy(alpha = 0.1f))
+                        .background(SharkPositive.copy(alpha = 0.1f))
                         .padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.CheckCircle, null, tint = SharkNavy, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.CheckCircle, null, tint = SharkPositive, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text("Goal completed! 🎉", color = SharkNavy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Goal completed! 🎉", color = SharkPositive, style = SharkTypography.bodyLarge.copy(fontWeight = FontWeight.Bold))
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 OutlinedButton(
                     onClick = {
@@ -573,16 +493,16 @@ fun GoalDetailSheet(
                             .update("isCompleted", false)
                             .addOnSuccessListener { onDismiss() }
                     },
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
                     shape    = RoundedCornerShape(16.dp),
-                    colors   = ButtonDefaults.outlinedButtonColors(contentColor = SharkMuted),
-                    border   = androidx.compose.foundation.BorderStroke(1.dp, SharkMuted.copy(alpha = 0.3f))
+                    colors   = ButtonDefaults.outlinedButtonColors(contentColor = SharkSecondary),
+                    border   = androidx.compose.foundation.BorderStroke(1.dp, SharkCardBorder)
                 ) {
-                    Text("Reopen Goal", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text("Reopen Goal", fontWeight = FontWeight.Bold)
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             TextButton(
                 onClick = {
@@ -593,9 +513,7 @@ fun GoalDetailSheet(
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Default.Delete, null, tint = SharkRed, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Delete Goal", color = SharkRed, fontSize = 13.sp)
+                Text("Delete Goal", color = SharkRed, style = SharkTypography.labelMedium)
             }
         }
     }
@@ -614,16 +532,13 @@ fun GoalArc(fraction: Float, color: Color) {
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val strokeWidth = 14f
+            val strokeWidth = 12.dp.toPx()
             val radius      = (size.minDimension / 2f) - strokeWidth
-            val topLeft     = androidx.compose.ui.geometry.Offset(
-                size.width / 2f - radius,
-                size.height / 2f - radius
-            )
             val arcSize = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
+            val topLeft = androidx.compose.ui.geometry.Offset(size.width / 2 - radius, size.height / 2 - radius)
 
             drawArc(
-                color       = Color.White.copy(alpha = 0.07f),
+                color       = SharkSurfaceHigh,
                 startAngle  = 135f,
                 sweepAngle  = 270f,
                 useCenter   = false,
@@ -646,11 +561,10 @@ fun GoalArc(fraction: Float, color: Color) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 "${(fraction * 100).toInt()}%",
-                color      = Color.White,
-                fontSize   = 28.sp,
-                fontWeight = FontWeight.Bold
+                color      = SharkLabel,
+                style      = SharkTypography.headlineLarge.copy(fontSize = 28.sp)
             )
-            Text("saved", color = SharkMuted, fontSize = 11.sp)
+            Text("saved", style = SharkTypography.labelSmall, color = SharkSecondary)
         }
     }
 }
@@ -658,13 +572,13 @@ fun GoalArc(fraction: Float, color: Color) {
 @Composable
 fun GoalDetailRow(label: String, value: String) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(label, color = SharkMuted, fontSize = 13.sp)
-        Text(value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, style = SharkTypography.labelMedium, color = SharkSecondary)
+        Text(value, style = SharkTypography.labelMedium.copy(fontWeight = FontWeight.Bold), color = SharkLabel)
     }
-    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.05f)))
+    HorizontalDivider(color = SharkCardBorder, thickness = 0.5.dp)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -682,11 +596,8 @@ fun AddGoalSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor   = SharkBase,
-        shape            = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
-        dragHandle = {
-            Box(modifier = Modifier.padding(top = 12.dp, bottom = 4.dp).width(40.dp).height(4.dp).background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(2.dp)))
-        }
+        containerColor   = SharkSurface,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = SharkSurfaceHigh) }
     ) {
         Column(
             modifier = Modifier
@@ -697,55 +608,51 @@ fun AddGoalSheet(
                 .navigationBarsPadding()
                 .imePadding()
         ) {
-            Text("New Goal", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("New Goal", style = SharkTypography.headlineMedium, color = SharkLabel)
             Spacer(modifier = Modifier.height(24.dp))
 
-            Text("Category", color = SharkMuted, fontSize = 12.sp)
-            Spacer(modifier = Modifier.height(10.dp))
+            Text("CATEGORY", style = SharkTypography.labelSmall, color = SharkSecondary)
+            Spacer(modifier = Modifier.height(12.dp))
 
-            goalCategories.chunked(3).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    row.forEach { cat ->
-                        val isSelected = selectedCat == cat
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(
-                                    if (isSelected) cat.color.copy(alpha = 0.2f)
-                                    else Color.White.copy(alpha = 0.05f)
-                                )
-                                .clickable { selectedCat = cat }
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                goalCategories.chunked(3).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { cat ->
+                            val isSelected = selectedCat == cat
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isSelected) SharkGold.copy(alpha = 0.15f) else SharkBg.copy(0.3f))
+                                    .border(0.5.dp, if (isSelected) SharkGold else SharkCardBorder, RoundedCornerShape(12.dp))
+                                    .clickable { selectedCat = cat }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Icon(cat.icon, null, tint = if (isSelected) cat.color else SharkMuted, modifier = Modifier.size(13.dp))
-                                Text(cat.name, color = if (isSelected) cat.color else SharkMuted, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Icon(cat.icon, null, tint = if (isSelected) SharkGold else SharkSecondary, modifier = Modifier.size(14.dp))
+                                    Text(cat.name, color = if (isSelected) SharkGold else SharkSecondary, style = SharkTypography.labelSmall)
+                                }
                             }
                         }
+                        if (row.size < 3) Spacer(Modifier.weight((3-row.size).toFloat()))
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            SheetInputField(name,         { name = it },         "Goal Name",   "e.g. Emergency Fund, New Laptop")
-            Spacer(modifier = Modifier.height(12.dp))
-            SheetInputField(targetAmount, { targetAmount = it }, "Target Amount","0.00", KeyboardType.Decimal)
-            Spacer(modifier = Modifier.height(12.dp))
-            SheetInputField(deadline,     { deadline = it },     "Deadline (optional)", "MM/DD/YYYY")
+            SheetInputField(name,         { name = it },         "GOAL NAME",   "e.g. Emergency Fund")
+            SheetInputField(targetAmount, { targetAmount = it }, "TARGET AMOUNT","0.00", KeyboardType.Decimal)
+            SheetInputField(deadline,     { deadline = it },     "DEADLINE (OPTIONAL)", "MM/DD/YYYY")
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             Button(
                 onClick = {
                     val parsedTarget = targetAmount.toDoubleOrNull()
                     if (name.isNotBlank() && parsedTarget != null && parsedTarget > 0) {
                         isSaving = true
-
                         val goal = Goal(
                             name         = name.trim(),
                             targetAmount = parsedTarget,
@@ -754,52 +661,19 @@ fun AddGoalSheet(
                             deadline     = deadline.trim(),
                             colorHex     = String.format("#%06X", (0xFFFFFF and selectedCat.color.value.toInt()))
                         )
-
-                        db.collection("users").document(uid)
-                            .collection("goals")
-                            .add(goal)
+                        db.collection("users").document(uid).collection("goals").add(goal)
                             .addOnSuccessListener { isSaving = false; onDismiss() }
                             .addOnFailureListener { isSaving = false }
                     }
                 },
-                modifier = Modifier.fillMaxWidth().height(54.dp),
-                shape    = RoundedCornerShape(18.dp),
-                colors   = ButtonDefaults.buttonColors(containerColor = SharkNavy),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape    = RoundedCornerShape(16.dp),
+                colors   = ButtonDefaults.buttonColors(containerColor = SharkGold, contentColor = SharkBg),
                 enabled  = !isSaving
             ) {
-                if (isSaving) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                else Text("Create Goal", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                if (isSaving) CircularProgressIndicator(color = SharkBg, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                else Text("Create Goal", fontWeight = FontWeight.Bold)
             }
         }
-    }
-}
-
-fun addSavingsToGoalByName(
-    uid      : String,
-    db       : FirebaseFirestore,
-    goalName : String,
-    amount   : Double,
-    goals    : List<Goal>
-) {
-    // Find the closest matching goal by name
-    val matched = goals.firstOrNull { goal ->
-        goal.name.equals(goalName, ignoreCase = true) ||
-        goal.name.contains(goalName, ignoreCase = true) ||
-        goalName.contains(goal.name, ignoreCase = true)
-    }
-
-    matched?.let { goal ->
-        val newSaved = goal.savedAmount + amount
-        val isComplete = newSaved >= goal.targetAmount
-
-        db.collection("users").document(uid)
-            .collection("goals")
-            .document(goal.id)
-            .update(
-                mapOf(
-                    "savedAmount"  to newSaved,
-                    "isCompleted"  to isComplete
-                )
-            )
     }
 }

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="neon_green">#39FF14</color>
-    <color name="navy">#0A1628</color>
+    <color name="shark_bg">#0E1117</color>
+    <color name="shark_gold">#E8B84B</color>
+    <color name="shark_surface">#161D27</color>
+    <color name="white">#FFFFFF</color>
 </resources>

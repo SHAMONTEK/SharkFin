@@ -1,5 +1,8 @@
 package com.example.sharkfin
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,56 +16,60 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue // Required for 'by' property delegates
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.sharkfin.ui.theme.*
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.*
 
-// ─── DESIGN SYSTEM CONSTANTS (Marcus Bank Aesthetic) ──────────────────────
-val SharkBg         = Color(0xFF0E1117) // Dark Background
-val SharkWhite      = Color(0xFFFFFFFF)
-val SharkCardBorder = Color(0xFF1F2D3D) // Subtle Border
+// ─── DESIGN SYSTEM CONSTANTS ───────────────────────────────────────────
+val SharkBg         = Color(0xFF0E1117)
+val SharkSurface     = Color(0xFF161D27)
+val SharkSurfaceHigh = Color(0xFF1C2535)
+val SharkCardBorder = Color(0xFF1F2D3D)
 
-val SharkGold       = Color(0xFFE8B84B) // Marcus Gold
+val SharkGold       = Color(0xFFE8B84B)
 val SharkGoldGlow   = Color(0x26E8B84B)
 
-val SharkGreenDark  = Color(0xFF4CAF82)
-val SharkGreenMid   = Color(0xFF4CAF82)
-val SharkGreenLight = Color(0x1A4CAF82)
-
-val SharkLabel      = Color(0xFFFFFFFF) // High Contrast Text
-val SharkSecondary  = Color(0xFFB0BEC5) // Muted Text
+val SharkLabel      = Color(0xFFFFFFFF)
+val SharkWhite      = Color(0xFFFFFFFF)
+val SharkSecondary  = Color(0xFFB0BEC5)
 val SharkTertiary   = Color(0xFF546E7A)
 
-val SharkRed        = Color(0xFFE05C5C)
-val SharkAmber      = Color(0xFFE8944B)
-val SharkTeal       = Color(0xFF4BA3E8)
-val SharkPurple     = Color(0xFFAF52DE)
+val SharkPositive      = Color(0xFF4CAF82)
+val SharkNegative      = Color(0xFFE05C5C)
+val SharkRed           = Color(0xFFE05C5C)
+val SharkGreen         = Color(0xFF00C853)
+val SharkRedHigh       = Color(0xFFFF3B30)
+val SharkAmber          = Color(0xFFE8944B)
+val SharkTeal           = Color(0xFF4BA3E8)
+val SharkPurple         = Color(0xFFAF52DE)
+val SharkInfo           = Color(0xFF4BA3E8)
+
+val SharkIncomeColor = SharkGreen
+val SharkSpentColor  = SharkRedHigh
 
 val SharkIncomeCategories = listOf("Income", "1099 Income", "Passive Income", "Salary", "Bonus", "Dividend", "Side Hustle")
 
-// ─── LEGACY BRIDGE (Updated for Marcus Aesthetic) ───────────────────────────
-val SharkBlack        = Color(0xFF000000)
-val SharkDark         = Color(0xFF050505)
-val SharkDeepOcean    = Color(0xFF0E1117) 
-val SharkCard         = Color(0xFF161D27) // SharkSurface
-val SharkBorderSubtle = SharkCardBorder
-val SharkGreen        = SharkGold         // Gold as primary accent
+// ─── LEGACY BRIDGE ────────────────────────────────────────────────────────
+val SharkBlack        = SharkBg
 val SharkNavy         = SharkGold
 val SharkMuted        = SharkSecondary
 val SharkBase         = SharkBg
-val SharkSurface      = Color(0xFF161D27)
-val SharkSurfaceHigh  = Color(0xFF1C2535)
+val SharkGreenMid     = SharkPositive
+val SharkDeepOcean    = SharkBg
+val SharkBorderSubtle = SharkCardBorder
+val SharkCard         = SharkSurface
 
 // ─── MODIFIERS ────────────────────────────────────────────────────────────
 fun Modifier.glassCard(cornerRadius: Float = 22f, alpha: Float = 1.0f): Modifier = this
@@ -79,13 +86,13 @@ val billCategories: List<BillCategory> = listOf(
     BillCategory("Housing", Icons.Default.Home, SharkAmber),
     BillCategory("Utilities", Icons.Default.FlashOn, SharkTeal),
     BillCategory("Subscriptions", Icons.Default.Tv, SharkPurple),
-    BillCategory("Transport", Icons.Default.DirectionsCar, SharkNavy),
+    BillCategory("Transport", Icons.Default.DirectionsCar, SharkGold),
     BillCategory("Insurance", Icons.Default.Security, SharkRed),
     BillCategory("Other", Icons.Default.MoreHoriz, SharkSecondary)
 )
 
 val expenseCategories: List<ExpenseCategory> = listOf(
-    ExpenseCategory("Income", Icons.AutoMirrored.Filled.TrendingUp, SharkGreenMid),
+    ExpenseCategory("Income", Icons.AutoMirrored.Filled.TrendingUp, SharkPositive),
     ExpenseCategory("Bills & Utilities", Icons.AutoMirrored.Filled.ReceiptLong, SharkAmber),
     ExpenseCategory("Entertainment", Icons.Default.MusicNote, SharkPurple),
     ExpenseCategory("Food", Icons.Default.Restaurant, SharkTeal),
@@ -93,7 +100,7 @@ val expenseCategories: List<ExpenseCategory> = listOf(
 )
 
 val goalCategories: List<GoalCategory> = listOf(
-    GoalCategory("Savings", Icons.Default.Savings, SharkGreenMid),
+    GoalCategory("Savings", Icons.Default.Savings, SharkPositive),
     GoalCategory("Emergency", Icons.Default.Shield, SharkRed),
     GoalCategory("Tech", Icons.Default.Laptop, SharkTeal),
     GoalCategory("Other", Icons.Default.Star, SharkSecondary)
@@ -123,9 +130,35 @@ data class PortfolioAsset(val id: String = "", val symbol: String = "", val shar
 
 // ─── UI COMPONENTS ────────────────────────────────────────────────────────
 @Composable
-fun SharkCard(content: @Composable ColumnScope.() -> Unit) {
+fun CountingText(
+    value: Double,
+    style: TextStyle,
+    color: Color,
+    prefix: String = "$",
+    durationMillis: Int = 1200
+) {
+    var targetValue by remember { mutableStateOf(0.0) }
+    val animatedValue by animateFloatAsState(
+        targetValue = targetValue.toFloat(),
+        animationSpec = tween(durationMillis, easing = FastOutSlowInEasing),
+        label = "counting"
+    )
+
+    LaunchedEffect(value) {
+        targetValue = value
+    }
+
+    Text(
+        text = "$prefix${String.format(Locale.US, "%,.2f", animatedValue)}",
+        style = style,
+        color = color
+    )
+}
+
+@Composable
+fun SharkCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .background(SharkSurface, RoundedCornerShape(22.dp))
             .border(0.5.dp, SharkCardBorder, RoundedCornerShape(22.dp))
@@ -137,10 +170,8 @@ fun SharkCard(content: @Composable ColumnScope.() -> Unit) {
 fun SharkSectionHeader(text: String) {
     Text(
         text = text.uppercase(),
+        style = SharkTypography.labelSmall,
         color = SharkSecondary,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = 1.sp,
         modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
     )
 }
@@ -150,20 +181,20 @@ fun FeatureTutorialOverlay(title: String, description: String, onDismiss: () -> 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(SharkBlack.copy(alpha = 0.8f))
+            .background(Color.Black.copy(alpha = 0.8f))
             .clickable { onDismiss() }
             .padding(32.dp),
         contentAlignment = Alignment.Center
     ) {
         SharkCard {
-            Text(title, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = SharkLabel)
+            Text(title, style = SharkTypography.headlineMedium, color = SharkLabel)
             Spacer(Modifier.height(8.dp))
-            Text(description, fontSize = 15.sp, color = SharkSecondary, lineHeight = 20.sp)
+            Text(description, style = SharkTypography.bodyMedium, color = SharkSecondary)
             Spacer(Modifier.height(24.dp))
             Button(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = SharkGreenMid),
+                colors = ButtonDefaults.buttonColors(containerColor = SharkGold, contentColor = SharkBg),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text("Got it", fontWeight = FontWeight.Bold)
@@ -172,7 +203,6 @@ fun FeatureTutorialOverlay(title: String, description: String, onDismiss: () -> 
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SheetInputField(
     value: String,
@@ -183,7 +213,7 @@ fun SheetInputField(
     enabled: Boolean = true
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Text(label, color = SharkSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Text(label, style = SharkTypography.labelSmall, color = SharkSecondary)
         Spacer(modifier = Modifier.height(4.dp))
         TextField(
             value = value,
@@ -197,7 +227,9 @@ fun SheetInputField(
                 unfocusedContainerColor = Color.Transparent,
                 disabledContainerColor = Color.Transparent,
                 focusedIndicatorColor = SharkGold,
-                unfocusedIndicatorColor = SharkCardBorder
+                unfocusedIndicatorColor = SharkCardBorder,
+                focusedTextColor = SharkLabel,
+                unfocusedTextColor = SharkLabel
             )
         )
     }
@@ -206,8 +238,8 @@ fun SheetInputField(
 @Composable
 fun MiniStat(label: String, value: String, positive: Boolean) {
     Column {
-        Text(label, color = SharkSecondary, fontSize = 11.sp)
-        Text(value, color = if (positive) SharkGreenMid else SharkRed, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text(label, style = SharkTypography.labelSmall, color = SharkSecondary)
+        Text(value, color = if (positive) SharkPositive else SharkRed, style = SharkTypography.bodyLarge.copy(fontWeight = FontWeight.Bold))
     }
 }
 
@@ -216,14 +248,15 @@ fun CoachMark(text: String, modifier: Modifier = Modifier, onDismiss: () -> Unit
     Box(
         modifier = modifier
             .padding(8.dp)
-            .background(SharkGreenLight, RoundedCornerShape(12.dp))
+            .background(SharkGold.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+            .border(0.5.dp, SharkGold.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
             .clickable { onDismiss() }
             .padding(12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Lightbulb, null, tint = SharkGreenMid, modifier = Modifier.size(14.dp))
+            Icon(Icons.Default.Lightbulb, null, tint = SharkGold, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(8.dp))
-            Text(text, color = SharkGreenDark, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Text(text, color = SharkLabel, style = SharkTypography.labelMedium)
         }
     }
 }
@@ -235,7 +268,7 @@ fun SharkChatBubble(message: String, isShark: Boolean) {
         horizontalArrangement = if (isShark) Arrangement.Start else Arrangement.End
     ) {
         if (isShark) {
-            Box(Modifier.size(24.dp).clip(CircleShape).background(SharkGreenLight), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(24.dp).clip(CircleShape).background(SharkGold.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
                 Text("🦈", fontSize = 12.sp)
             }
             Spacer(Modifier.width(8.dp))
@@ -244,12 +277,12 @@ fun SharkChatBubble(message: String, isShark: Boolean) {
             modifier = Modifier
                 .widthIn(max = 280.dp)
                 .background(
-                    color = if (isShark) Color(0xFFE9E9EB) else SharkGreenDark,
+                    color = if (isShark) SharkSurface else SharkGold,
                     shape = RoundedCornerShape(18.dp)
                 )
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
-            Text(message, color = if (isShark) SharkLabel else Color.White, fontSize = 15.sp)
+            Text(message, color = if (isShark) SharkLabel else SharkBg, style = SharkTypography.bodyMedium)
         }
     }
 }
@@ -279,21 +312,19 @@ fun BillCalendar(
     SharkCard {
         Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
             IconButton(onClick = onPrevMonth) { Icon(Icons.Default.ChevronLeft, null, tint = SharkSecondary) }
-            Text(monthName, color = SharkLabel, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(monthName, color = SharkLabel, style = SharkTypography.bodyLarge.copy(fontWeight = FontWeight.Bold))
             IconButton(onClick = onNextMonth) { Icon(Icons.Default.ChevronRight, null, tint = SharkSecondary) }
         }
         Spacer(Modifier.height(16.dp))
 
-        // Weekday headers
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
             listOf("S", "M", "T", "W", "T", "F", "S").forEach { day ->
-                Text(day, color = SharkSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(32.dp), textAlign = TextAlign.Center)
+                Text(day, color = SharkSecondary, style = SharkTypography.labelSmall, modifier = Modifier.width(32.dp), textAlign = TextAlign.Center)
             }
         }
         
         Spacer(Modifier.height(8.dp))
 
-        // Calendar Grid
         val totalCells = ((maxDays + firstDayOfWeek - 1 + 6) / 7) * 7
         for (i in 0 until totalCells step 7) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
@@ -314,8 +345,7 @@ fun BillCalendar(
                                 Text(
                                     "$dayNum", 
                                     color = if (isToday) SharkGold else SharkLabel, 
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
+                                    style = if (isToday) SharkTypography.bodyMedium.copy(fontWeight = FontWeight.Bold) else SharkTypography.bodyMedium
                                 )
                                 if (hasBill) {
                                     Box(Modifier.size(4.dp).background(SharkAmber, CircleShape))
@@ -342,12 +372,12 @@ fun ordinal(n: Int): String = when {
 }
 
 fun getCategoryColor(name: String): Color = when (name) {
-    "Income" -> SharkGreenMid
+    "Income", "Salary", "Dividend" -> SharkPositive
     "Bills & Utilities", "Housing" -> SharkAmber
     "Entertainment", "Subscriptions" -> SharkPurple
     "Food" -> SharkTeal
     "Insurance", "Emergency" -> SharkRed
-    "Transport" -> SharkTeal
+    "Transport" -> SharkGold
     else -> SharkSecondary
 }
 
@@ -391,24 +421,4 @@ fun calcMoneyScore(
     val passiveVsSpend = if (spent > 0) passiveIncome / spent else 0.0
     score += when { passiveVsSpend >= 1.0 -> 10; passiveVsSpend >= 0.5 -> 7; passiveVsSpend >= 0.1 -> 4; passiveVsSpend > 0 -> 2; else -> 0 }
     return score.coerceIn(0, 100)
-}
-
-@Composable
-fun MarcusThemeContrastAudit() {
-    // This is a helper component for the developer to audit contrast levels
-    // during development of the Marcus-style theme.
-    Column(Modifier.background(Color(0xFF0E1117)).padding(16.dp)) {
-        Text("Marcus Dark Theme Contrast Audit", color = Color.White, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(24.dp).background(Color(0xFFE8B84B)))
-            Spacer(Modifier.width(8.dp))
-            Text("SharkGold (AA on Black)", color = Color(0xFFE8B84B))
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(24.dp).background(Color(0xFFB0BEC5)))
-            Spacer(Modifier.width(8.dp))
-            Text("SharkTextSecondary (Pass)", color = Color(0xFFB0BEC5))
-        }
-    }
 }

@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -16,15 +15,18 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -40,10 +42,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import androidx.core.content.ContextCompat
 import com.airbnb.lottie.compose.*
+import com.example.sharkfin.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Date
@@ -68,6 +72,7 @@ data class EnvironmentTile(
     val trendPoints : List<Float> = emptyList()
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     uid             : String,
@@ -86,65 +91,85 @@ fun HomeScreen(
     val context   = LocalContext.current
     val scope     = rememberCoroutineScope()
     val haptic    = LocalHapticFeedback.current
-    val incomeCategories = SharkIncomeCategories
 
-    // ── FINANCIAL DATA PREP ───────────────────────────────────────────────────
-    val wizardIncome = (discoveryData?.get("monthlyIncome") as? Double) ?: 0.0
-    val wizardObligations = (discoveryData?.get("monthlyObligations") as? Double) ?: 0.0
-    val totalIncome = incomeSources.sumOf { it.amount }.coerceAtLeast(wizardIncome)
-    val totalSpent = expenses.filter { it.category !in incomeCategories }.sumOf { it.amount }
-    val balance = expenses.filter { it.category in incomeCategories }.sumOf { it.amount } - totalSpent
+    // ── FINANCIAL DATA CALCULATIONS ──
+    val financialMetrics = remember(expenses, incomeSources, bills, goals, debts, discoveryData) {
+        val incomeCategories = SharkIncomeCategories
+        val wizardIncome = (discoveryData?.get("monthlyIncome") as? Double) ?: 0.0
+        val wizardObligations = (discoveryData?.get("monthlyObligations") as? Double) ?: 0.0
+        
+        val totalIncome = incomeSources.sumOf { it.amount }.coerceAtLeast(wizardIncome)
+        val totalSpent = expenses.filter { it.category !in incomeCategories }.sumOf { it.amount }
+        val balance = expenses.filter { it.category in incomeCategories }.sumOf { it.amount } - totalSpent
 
-    fun isToday(date: Date): Boolean {
-        val cal1 = Calendar.getInstance()
-        val cal2 = Calendar.getInstance().apply { time = date }
-        return cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR) &&
-                cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR)
+        fun isToday(date: Date): Boolean {
+            val cal1 = Calendar.getInstance()
+            val cal2 = Calendar.getInstance().apply { time = date }
+            return cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR) &&
+                    cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR)
+        }
+
+        val spentToday = expenses.filter { isToday(it.createdAtDate) && it.category !in incomeCategories }.sumOf { it.amount }
+        val dailyBudget = if (totalIncome > 0) totalIncome / 30.0 else 0.0
+        val totalObligations = bills.sumOf { it.amount } + debts.sumOf { it.minimumPayment } + recurringBills.sumOf { it.amount }
+        val maxObligations = totalObligations.coerceAtLeast(wizardObligations)
+
+        val spendableTodayMax = ((dailyBudget - (maxObligations / 30.0)) * 0.20).coerceAtLeast(0.0)
+        val spendableLeft = (spendableTodayMax - spentToday).coerceAtLeast(0.0)
+        val passiveIncome = expenses.filter { it.category == "Passive Income" }.sumOf { it.amount }
+        val avgDailyBurn = if (expenses.isNotEmpty()) totalSpent / 30.0 else (maxObligations / 30.0)
+
+        val score = calcMoneyScore(
+            income = totalIncome, spent = totalSpent, bills = bills,
+            goals = goals, debts = debts, avgDailyBurn = avgDailyBurn,
+            balance = balance, passiveIncome = passiveIncome
+        )
+        
+        object {
+            val totalIncome = totalIncome
+            val totalSpent = totalSpent
+            val balance = balance
+            val spentToday = spentToday
+            val spendableLeft = spendableLeft
+            val spendableTodayMax = spendableTodayMax
+            val passiveIncome = passiveIncome
+            val score = score
+            val avgDailyBurn = avgDailyBurn
+            val runwayDays = if (avgDailyBurn > 0) (balance / avgDailyBurn).toInt().coerceAtLeast(0) else 999
+        }
     }
 
-    val spentToday = expenses.filter { isToday(it.createdAtDate) && it.category !in incomeCategories }.sumOf { it.amount }
-    val dailyBudget = if (totalIncome > 0) totalIncome / 30.0 else 0.0
-    val totalObligations = bills.sumOf { it.amount } + debts.sumOf { it.minimumPayment } + recurringBills.sumOf { it.amount }
-    val maxObligations = totalObligations.coerceAtLeast(wizardObligations)
+    val firstName = remember(displayName) { displayName.split(" ").firstOrNull()?.ifBlank { "Shark" } ?: "Shark" }
 
-    val spendableTodayMax = ((dailyBudget - (maxObligations / 30.0)) * 0.20).coerceAtLeast(0.0)
-    val spendableLeft = (spendableTodayMax - spentToday).coerceAtLeast(0.0)
-    val passiveIncome = expenses.filter { it.category == "Passive Income" }.sumOf { it.amount }
-    val avgDailyBurn = if (expenses.isNotEmpty()) totalSpent / 30.0 else (maxObligations / 30.0)
-
-    val score = calcMoneyScore(
-        income = totalIncome, spent = totalSpent, bills = bills,
-        goals = goals, debts = debts, avgDailyBurn = avgDailyBurn,
-        balance = balance, passiveIncome = passiveIncome
-    )
-
-    val firstName = displayName.split(" ").firstOrNull()?.ifBlank { "Shark" } ?: "Shark"
-
-    // ── AI AGENT STATE ───────────────────────────────────────────────────────
+    // ── STATE ──
     var chatOpen by remember { mutableStateOf(false) }
     var chatMessages by remember { mutableStateOf(listOf<SharkChatMessage>()) }
     var isListening by remember { mutableStateOf(false) }
     var liveTranscript by remember { mutableStateOf("") }
     var isThinking by remember { mutableStateOf(false) }
-    var currentSession by remember { mutableStateOf(SharkAgentSession.IDLE) }
-    var awaitingConfirm by remember { mutableStateOf<ParsedTransaction?>(null) }
     var textInputVal by remember { mutableStateOf("") }
+    var awaitingConfirm by remember { mutableStateOf<ParsedTransaction?>(null) }
+    
+    var showQuickEntry by remember { mutableStateOf<Boolean?>(null) } // null = closed, true = income, false = spent
+    var showPowerHub by remember { mutableStateOf(false) }
 
-    val financialState = SharkFinancialState(
-        dailyBudget = dailyBudget,
-        dailySpentSoFar = spentToday,
-        currentStreak = 0,
-        goalPercent = 50,
-        balance = balance,
-        moneyScore = score,
-        paydayInDays = null,
-        knownRecurring = if (recurringBills.isEmpty()) defaultRecurringBills else recurringBills,
-        upcomingBills = bills.filter { !it.isPaid },
-        activeGoals = goals.filter { !it.isCompleted },
-        expenses = expenses,
-        averageDailyBurn = avgDailyBurn,
-        totalDebt = debts.sumOf { it.currentBalance }
-    )
+    val financialState = remember(financialMetrics) {
+        SharkFinancialState(
+            dailyBudget = financialMetrics.totalIncome / 30.0,
+            dailySpentSoFar = financialMetrics.spentToday,
+            currentStreak = 0,
+            goalPercent = 50,
+            balance = financialMetrics.balance,
+            moneyScore = financialMetrics.score,
+            paydayInDays = null,
+            knownRecurring = if (recurringBills.isEmpty()) defaultRecurringBills else recurringBills,
+            upcomingBills = bills.filter { !it.isPaid },
+            activeGoals = goals.filter { !it.isCompleted },
+            expenses = expenses,
+            averageDailyBurn = financialMetrics.avgDailyBurn,
+            totalDebt = debts.sumOf { it.currentBalance }
+        )
+    }
 
     fun logParsedTransaction(parsed: ParsedTransaction) {
         if (parsed.amount != null) {
@@ -179,7 +204,7 @@ fun HomeScreen(
                 return@launch
             }
 
-            val parsed = AICoachNLP.parse(input, financialState.knownRecurring, currentSession)
+            val parsed = AICoachNLP.parse(input, financialState.knownRecurring, SharkAgentSession.IDLE)
             val response = AICoachResponse.generate(parsed, financialState)
 
             chatMessages = chatMessages + SharkChatMessage(response.message, isShark = true)
@@ -192,7 +217,7 @@ fun HomeScreen(
         }
     }
 
-    // ── SPEECH RECOGNITION SETUP ─────────────────────────────────────────────
+    // ── SPEECH RECOGNITION ──
     val speechRecognizer = remember { SpeechRecognizer.createSpeechRecognizer(context) }
     val recognizerIntent = remember {
         Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -238,13 +263,12 @@ fun HomeScreen(
         }
     }
 
-    // ── SHARK MOOD & LOTTIE ──────────────────────────────────────────────────
-    val runwayDays = if (avgDailyBurn > 0) (balance / avgDailyBurn).toInt().coerceAtLeast(0) else 999
+    // ── SHARK MOOD ──
     val sharkMood = when {
         isThinking      -> SharkMood.CURIOUS
-        runwayDays < 7  -> SharkMood.HUNGRY
-        score >= 70     -> SharkMood.HAPPY
-        spendableLeft <= 0 -> SharkMood.CONCERNED
+        financialMetrics.runwayDays < 7  -> SharkMood.HUNGRY
+        financialMetrics.score >= 70     -> SharkMood.HAPPY
+        financialMetrics.spendableLeft <= 0 -> SharkMood.CONCERNED
         else            -> SharkMood.NEUTRAL
     }
 
@@ -258,102 +282,285 @@ fun HomeScreen(
     }
     val lottieProgress by animateLottieCompositionAsState(composition = composition, iterations = LottieConstants.IterateForever, clipSpec = moodClip)
 
-    // ── TOOLKIT TILES ────────────────────────────────────────────────────────
-    val nextBill = bills.filter { !it.isPaid }.minByOrNull { it.dayOfMonth }
-    val topGoal = goals.filter { !it.isCompleted }.maxByOrNull { if(it.targetAmount > 0) it.savedAmount/it.targetAmount else 0.0 }
-    val savingsRate = if(totalIncome > 0) ((totalIncome - totalSpent) / totalIncome * 100).toInt() else 0
-
-    val toolkitTiles = listOf(
-        EnvironmentTile("Expense Tracker", "Expense Tracker", Icons.Default.AccountBalanceWallet, SharkGold, SharkGoldGlow, true, liveLabel = "TODAY'S SPEND", liveValue = "$${String.format(Locale.US, "%.2f", spentToday)}", liveSubValue = if(spentToday > spendableTodayMax) "Over limit" else "On track", trendPoints = listOf(0.4f, 0.7f, 0.3f, 0.9f, 0.6f, 0.8f)),
-        EnvironmentTile("Import Statement", "Import Statement", Icons.Default.FileUpload, SharkGold, SharkGoldGlow, true, tag = "NEW", tagBg = SharkGoldGlow, tagText = SharkGold, liveLabel = "LAST IMPORT", liveValue = "None yet", trendPoints = listOf(0.1f, 0.1f, 0.5f, 0.1f, 0.9f)),
-        EnvironmentTile("Bill Tracker", "Bill Tracker", Icons.Default.Receipt, SharkAmber, Color(0x1AEE944B), true, liveLabel = "NEXT DUE", liveValue = nextBill?.let { "$${it.amount.toInt()}" } ?: "All clear", liveSubValue = nextBill?.let { "${it.name} · ${ordinal(it.dayOfMonth)}" } ?: "No bills", trendPoints = listOf(0.2f, 0.8f, 0.1f, 0.9f, 0.3f)),
-        EnvironmentTile("Goal Tracker", "Goal Tracker", Icons.Default.Flag, SharkTeal, Color(0x1A4BA3E8), true, liveLabel = "TOP GOAL", liveValue = topGoal?.let { "${(it.savedAmount/it.targetAmount*100).toInt()}%" } ?: "Set goal", liveSubValue = topGoal?.name ?: "No active goals", trendPoints = listOf(0.1f, 0.2f, 0.4f, 0.7f, 0.85f)),
-        EnvironmentTile("Visual Models", "Visual Models", Icons.Default.BarChart, SharkPurple, Color(0x1AAF52DE), true, liveLabel = "SAVINGS RATE", liveValue = "$savingsRate%", liveSubValue = "vs 20% target", trendPoints = listOf(0.5f, 0.6f, 0.4f, 0.8f, 0.9f)),
-        EnvironmentTile("Tax Tracker", "Tax Tracker", Icons.Default.Description, SharkRed, Color(0x1AE05C5C), true, tag = "BETA", tagBg = Color(0x1AE05C5C), tagText = SharkRed, liveLabel = "EST. OWED", liveValue = "$${(totalIncome * 0.22).toInt()}", trendPoints = listOf(0.8f, 0.8f, 0.8f, 0.8f, 0.8f)),
-        EnvironmentTile("Dividend Tracker", "Dividend Tracker", Icons.Default.Payments, SharkGold, SharkGoldGlow, true, tag = "NEW", tagBg = SharkGoldGlow, tagText = SharkGold, liveLabel = "PASSIVE / MO", liveValue = "$${String.format(Locale.US, "%.2f", passiveIncome)}", trendPoints = listOf(0.1f, 0.25f, 0.4f, 0.6f, 0.8f)),
-        EnvironmentTile("Freedom Runway", "Freedom Runway", Icons.Default.FlightTakeoff, SharkGold, SharkGoldGlow, true, liveLabel = "RUNWAY", liveValue = if(runwayDays < 999) "$runwayDays days" else "Infinite", trendPoints = listOf(0.2f, 0.3f, 0.5f, 0.6f, 0.7f)),
-        EnvironmentTile("Settings", "Settings", Icons.Default.Settings, SharkSecondary, SharkSurface, true, liveLabel = "PROFILE", liveValue = firstName, liveSubValue = accountType)
-    )
-
-    val scoreColor = when { score >= 70 -> SharkGold; score >= 40 -> SharkAmber; else -> SharkRed }
-    val animatedScore by animateFloatAsState(score.toFloat(), tween(1000), label = "score")
-    val arcSweep by animateFloatAsState((score / 100f) * 240f, tween(1200, easing = EaseOutCubic), label = "arc")
-
+    // ── LAYOUT ──
     Box(Modifier.fillMaxSize().background(SharkBg)) {
-        Column(Modifier.fillMaxSize()) {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(0.dp, 0.dp, 0.dp, 100.dp)
-            ) {
-                item {
-                    Column(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 60.dp, bottom = 10.dp)) {
-                        Text("SHARKFIN: FINANCE PORTFOLIO", fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, color = SharkGold.copy(0.6f))
-                        Text("Hey, $firstName", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = SharkLabel, letterSpacing = (-0.5).sp)
-                    }
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 120.dp)
+        ) {
+            // Personalization & Top-Bar Identity
+            item(span = { GridItemSpan(2) }) {
+                Column(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 60.dp, bottom = 10.dp)) {
+                    Text("Welcome back,", style = SharkTypography.labelSmall.copy(fontWeight = FontWeight.Medium), color = SharkGold.copy(0.6f))
+                    Text(firstName, style = SharkTypography.displayLarge.copy(fontSize = 32.sp, fontWeight = FontWeight.ExtraBold), color = SharkLabel, letterSpacing = (-0.5).sp)
+                    Text("Last synced 2m ago", style = SharkTypography.labelSmall.copy(fontWeight = FontWeight.Normal), color = SharkSecondary.copy(0.5f), modifier = Modifier.padding(top = 2.dp))
                 }
+            }
 
-                item {
-                    Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        SharkCard {
-                            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Box(Modifier.size(60.dp), contentAlignment = Alignment.Center) {
-                                        Canvas(Modifier.fillMaxSize()) {
-                                            drawArc(scoreColor.copy(0.1f), 150f, 240f, false, style = Stroke(6f, cap = StrokeCap.Round))
-                                            drawArc(scoreColor, 150f, arcSweep, false, style = Stroke(6f, cap = StrokeCap.Round))
-                                        }
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text("${animatedScore.toInt()}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = scoreColor)
-                                            Text("SCORE", fontSize = 7.sp, fontWeight = FontWeight.Bold, color = SharkSecondary)
-                                        }
+            // Tile 1 (Large/Featured): "Current Pulse"
+            item(span = { GridItemSpan(2) }) {
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    val scoreColor = when { financialMetrics.score >= 70 -> SharkGold; financialMetrics.score >= 40 -> SharkAmber; else -> SharkRed }
+                    val animatedScore by animateFloatAsState(financialMetrics.score.toFloat(), tween(1000), label = "score")
+                    val arcSweep by animateFloatAsState((financialMetrics.score / 100f) * 240f, tween(1200, easing = EaseOutCubic), label = "arc")
+                    
+                    SharkCard {
+                        Text("CURRENT PULSE", style = SharkTypography.labelSmall, color = SharkSecondary)
+                        Spacer(Modifier.height(16.dp))
+                        Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Box(Modifier.size(60.dp), contentAlignment = Alignment.Center) {
+                                    Canvas(Modifier.fillMaxSize()) {
+                                        drawArc(scoreColor.copy(0.1f), 150f, 240f, false, style = Stroke(6f, cap = StrokeCap.Round))
+                                        drawArc(scoreColor, 150f, arcSweep, false, style = Stroke(6f, cap = StrokeCap.Round))
                                     }
-                                    Column {
-                                        Text("Money health", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = SharkLabel)
-                                        Text(if(score >= 70) "Excellent" else "Watch spend", fontSize = 11.sp, color = SharkSecondary)
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("${animatedScore.toInt()}", style = SharkTypography.bodyLarge.copy(fontWeight = FontWeight.Bold), color = scoreColor)
+                                        Text("SCORE", style = SharkTypography.labelSmall, color = SharkSecondary)
                                     }
                                 }
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text("BALANCE", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = SharkSecondary, letterSpacing = 1.sp)
-                                    Text("$${String.format(Locale.US, "%,.2f", balance)}", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SharkLabel)
-                                }
-                            }
-                            Spacer(Modifier.height(20.dp))
-                            HorizontalDivider(color = SharkBg, thickness = 1.dp)
-                            Spacer(Modifier.height(16.dp))
-                            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.Bottom) {
                                 Column {
-                                    Text("SPENDABLE TODAY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = SharkSecondary)
-                                    Text("$${String.format(Locale.US, "%,.2f", spendableLeft)}", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = if(spendableLeft > 0) SharkGold else SharkRed)
-                                    Text("keeps 80% after bills", fontSize = 10.sp, color = SharkTertiary)
+                                    Text("Money health", style = SharkTypography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = SharkLabel)
+                                    Text(if(financialMetrics.score >= 70) "Excellent" else "Watch spend", style = SharkTypography.labelMedium, color = SharkSecondary)
                                 }
-                                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    WidgetMiniBar("IN", 1f, SharkGold, "$${totalIncome.toInt()}")
-                                    WidgetMiniBar("OUT", (totalSpent/totalIncome.coerceAtLeast(1.0)).toFloat(), SharkAmber, "$${totalSpent.toInt()}")
-                                }
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("DAILY SPENDABLE", style = SharkTypography.labelSmall, color = SharkSecondary)
+                                CountingText(financialMetrics.spendableLeft, SharkTypography.headlineLarge, color = if(financialMetrics.spendableLeft > 0) SharkGold else SharkRed)
+                            }
+                        }
+                        Spacer(Modifier.height(20.dp))
+                        HorizontalDivider(color = SharkBg, thickness = 1.dp)
+                        Spacer(Modifier.height(16.dp))
+                        Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.Bottom) {
+                            Column(Modifier.weight(1f)) {
+                                WidgetMiniBar("IN", 1f, SharkIncomeColor, "$${financialMetrics.totalIncome.toInt()}")
+                                Spacer(Modifier.height(8.dp))
+                                WidgetMiniBar("OUT", (financialMetrics.totalSpent/financialMetrics.totalIncome.coerceAtLeast(1.0)).toFloat(), SharkSpentColor, "$${financialMetrics.totalSpent.toInt()}")
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("RUNWAY", style = SharkTypography.labelSmall, color = SharkSecondary)
+                                Text(if(financialMetrics.runwayDays < 999) "${financialMetrics.runwayDays} DAYS" else "INFINITE", style = SharkTypography.bodyLarge.copy(fontWeight = FontWeight.Bold), color = SharkLabel)
                             }
                         }
                     }
                 }
+            }
 
-                item {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 16.dp), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                        Text("YOUR TOOLKIT", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SharkSecondary, letterSpacing = 1.5.sp)
-                        Text("See all", fontSize = 13.sp, color = SharkGold, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onFeatureClick("Features") })
-                    }
+            // Tile 2: Upcoming Bill (Medium)
+            item {
+                val nextBill = bills.filter { !it.isPaid }.minByOrNull { it.dayOfMonth }
+                Box(Modifier.padding(start = 16.dp, end = 6.dp, top = 8.dp, bottom = 8.dp)) {
+                    ToolkitTile(
+                        EnvironmentTile("Bill Tracker", "Upcoming Bill", Icons.Default.Receipt, SharkAmber, Color(0x1AEE944B), true, 
+                            liveLabel = nextBill?.name ?: "All clear", 
+                            liveValue = nextBill?.let { "$${it.amount.toInt()}" } ?: "—",
+                            liveSubValue = nextBill?.let { "Due ${ordinal(it.dayOfMonth)}" } ?: "No bills"
+                        ),
+                        Modifier.fillMaxWidth()
+                    ) { onFeatureClick("Bill Tracker") }
+                }
+            }
+
+            // Tile 3: Active Goal (Medium)
+            item {
+                val topGoal = goals.filter { !it.isCompleted }.maxByOrNull { if(it.targetAmount > 0) it.savedAmount/it.targetAmount else 0.0 }
+                Box(Modifier.padding(start = 6.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)) {
+                    ToolkitTile(
+                        EnvironmentTile("Goal Tracker", "Active Goal", Icons.Default.Flag, SharkTeal, Color(0x1A4BA3E8), true,
+                            liveLabel = topGoal?.name ?: "Set goal",
+                            liveValue = topGoal?.let { "${(it.savedAmount/it.targetAmount*100).toInt()}%" } ?: "—",
+                            liveSubValue = topGoal?.let { "$${it.savedAmount.toInt()} saved" } ?: "Build future"
+                        ),
+                        Modifier.fillMaxWidth()
+                    ) { onFeatureClick("Goal Tracker") }
+                }
+            }
+
+            // Tile 4: Quick Market Watch (Small/Full Width)
+            item(span = { GridItemSpan(2) }) {
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    ToolkitTile(
+                        EnvironmentTile("Stock Tracker", "Quick Market Watch", Icons.AutoMirrored.Filled.TrendingUp, SharkGold, SharkGoldGlow, true,
+                            liveLabel = "MARKET PULSE",
+                            liveValue = "Bullish",
+                            liveSubValue = "S&P 500 up 0.4% today"
+                        ),
+                        Modifier.fillMaxWidth()
+                    ) { onFeatureClick("Stock Tracker") }
+                }
+            }
+            
+            // Other Toolkit Tiles
+            item(span = { GridItemSpan(2) }) {
+                Text("REST OF TOOLKIT", style = SharkTypography.titleSmall, modifier = Modifier.padding(start = 22.dp, top = 16.dp, bottom = 8.dp))
+            }
+            
+            val otherTiles = listOf(
+                 EnvironmentTile("Visual Models", "Visual Models", Icons.Default.BarChart, SharkPurple, Color(0x1AAF52DE), true, liveLabel = "CASH FLOW", liveValue = "Active"),
+                 EnvironmentTile("Tax Tracker", "Tax Tracker", Icons.Default.Description, SharkRed, Color(0x1AE05C5C), true, liveLabel = "EST. TAX", liveValue = "$${(financialMetrics.totalIncome * 0.22).toInt()}"),
+                 EnvironmentTile("Dividend Tracker", "Dividends", Icons.Default.Payments, SharkGold, SharkGoldGlow, true, liveLabel = "PASSIVE", liveValue = "$${String.format(Locale.US, "%.2f", financialMetrics.passiveIncome)}"),
+                 EnvironmentTile("Settings", "Settings", Icons.Default.Settings, SharkSecondary, SharkSurface, true, liveLabel = "PROFILE", liveValue = firstName)
+            )
+            
+            items(otherTiles, key = { it.id }) { tile ->
+                 Box(Modifier.padding(8.dp)) {
+                     ToolkitTile(tile, Modifier.fillMaxWidth()) { onFeatureClick(tile.id) }
+                 }
+            }
+        }
+
+        // ── POWER HUB & QUICK ACTION FLOW ──
+        Box(Modifier.align(Alignment.BottomEnd).padding(bottom = 100.dp, end = 16.dp)) {
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Split-Action Flow Buttons
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SmallFloatingActionButton(
+                        onClick = { showQuickEntry = true },
+                        containerColor = SharkIncomeColor,
+                        contentColor = SharkBg,
+                        shape = CircleShape
+                    ) { Icon(Icons.Default.Add, "Add Income") }
+                    
+                    SmallFloatingActionButton(
+                        onClick = { showQuickEntry = false },
+                        containerColor = SharkSpentColor,
+                        contentColor = SharkWhite,
+                        shape = CircleShape
+                    ) { Icon(Icons.Default.Remove, "Add Expense") }
                 }
 
-                items(toolkitTiles.chunked(2)) { pair ->
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp), Arrangement.spacedBy(12.dp)) {
-                        pair.forEach { tile ->
-                            ToolkitTile(tile, Modifier.weight(1f)) { if(tile.available) onFeatureClick(tile.id) }
-                        }
-                        if(pair.size == 1) Spacer(Modifier.weight(1f))
+                // Primary Power Hub Button
+                FloatingActionButton(
+                    onClick = { showPowerHub = true },
+                    containerColor = SharkGold,
+                    contentColor = SharkBg,
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.Bolt, null)
+                        Text("POWER HUB", fontWeight = FontWeight.ExtraBold)
                     }
                 }
             }
         }
 
-        // ── CHAT OVERLAY ─────────────────────────────────────────────────────
+        // ── POWER HUB SHEET ──
+        if (showPowerHub) {
+            ModalBottomSheet(
+                onDismissRequest = { showPowerHub = false },
+                containerColor = SharkBg,
+                dragHandle = { BottomSheetDefaults.DragHandle(color = SharkSurfaceHigh) }
+            ) {
+                Column(Modifier.fillMaxWidth().padding(24.dp).navigationBarsPadding()) {
+                    Text("TOTAL NET WORTH", style = SharkTypography.labelSmall, color = SharkSecondary)
+                    CountingText(financialMetrics.balance, SharkTypography.displayLarge.copy(fontSize = 48.sp), color = SharkLabel)
+                    Text("Bank + Cash + Crypto", style = SharkTypography.labelSmall, color = SharkSecondary.copy(0.5f))
+                    
+                    Spacer(Modifier.height(32.dp))
+                    Text("FIXED BILLS HUB", style = SharkTypography.labelSmall, color = SharkSecondary)
+                    Spacer(Modifier.height(12.dp))
+                    
+                    val allRecurring = if (recurringBills.isEmpty()) defaultRecurringBills else recurringBills
+                    LazyColumn(Modifier.heightIn(max = 300.dp)) {
+                        items(allRecurring) { bill ->
+                            var billAmt by remember { mutableStateOf(bill.amount.toString()) }
+                            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
+                                    Box(Modifier.size(40.dp).background(SharkSurface, CircleShape), Alignment.Center) {
+                                        Icon(Icons.Default.Repeat, null, tint = SharkSecondary, modifier = Modifier.size(18.dp))
+                                    }
+                                    Column {
+                                        Text(bill.label, color = SharkLabel, fontWeight = FontWeight.Bold)
+                                        Text(bill.category, style = SharkTypography.labelSmall, color = SharkSecondary)
+                                    }
+                                }
+                                TextField(
+                                    value = billAmt,
+                                    onValueChange = { billAmt = it },
+                                    modifier = Modifier.width(80.dp),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                        focusedIndicatorColor = SharkGold,
+                                        unfocusedIndicatorColor = Color.Transparent,
+                                        focusedTextColor = SharkLabel
+                                    ),
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontWeight = FontWeight.Bold, textAlign = TextAlign.End, color = SharkLabel, fontSize = 16.sp),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                                )
+                            }
+                        }
+                    }
+                    
+                    Spacer(Modifier.height(24.dp))
+                    Button(
+                        onClick = { 
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            // Logic to save updated bills to Firestore could be added here
+                            showPowerHub = false 
+                        },
+                        modifier = Modifier.fillMaxWidth().height(60.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = SharkGold, contentColor = SharkBg),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Icon(Icons.Default.CloudUpload, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("SAVE TO CLOUD", fontWeight = FontWeight.ExtraBold)
+                    }
+                }
+            }
+        }
+
+        // ── QUICK ENTRY MINI-SHEET ──
+        if (showQuickEntry != null) {
+            ModalBottomSheet(
+                onDismissRequest = { showQuickEntry = null },
+                containerColor = SharkSurface,
+                dragHandle = { BottomSheetDefaults.DragHandle(color = SharkSurfaceHigh) }
+            ) {
+                var entryText by remember { mutableStateOf("") }
+                Column(Modifier.fillMaxWidth().padding(24.dp).navigationBarsPadding().imePadding()) {
+                    Text(if(showQuickEntry == true) "QUICK INCOME" else "QUICK SPENT", 
+                        style = SharkTypography.labelSmall, 
+                        color = if(showQuickEntry == true) SharkIncomeColor else SharkSpentColor)
+                    
+                    TextField(
+                        value = entryText,
+                        onValueChange = { entryText = it },
+                        placeholder = { Text("e.g. $50 for Groceries", color = SharkTertiary) },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = SharkGold,
+                            unfocusedIndicatorColor = SharkCardBorder,
+                            focusedTextColor = SharkLabel
+                        ),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            processVoiceInput(entryText)
+                            showQuickEntry = null
+                        })
+                    )
+                    
+                    Button(
+                        onClick = { 
+                            processVoiceInput(entryText)
+                            showQuickEntry = null 
+                        },
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = SharkGold, contentColor = SharkBg),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Text("CONFIRM", fontWeight = FontWeight.ExtraBold)
+                    }
+                }
+            }
+        }
+
+        // ── CHAT OVERLAY ──
         AnimatedVisibility(chatOpen, enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut()) {
             Box(Modifier.fillMaxSize().background(SharkBg)) {
                 Column(Modifier.fillMaxSize().padding(top = 50.dp)) {
@@ -363,8 +570,8 @@ fun HomeScreen(
                                 LottieAnimation(composition, { lottieProgress }, modifier = Modifier.fillMaxSize())
                             }
                             Column {
-                                Text("Sharkie AI", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = SharkLabel)
-                                Text(if(isListening) "Listening..." else if (isThinking) "Thinking..." else "Ready to help", color = SharkGold, fontSize = 12.sp)
+                                Text("Sharkie AI", style = SharkTypography.headlineMedium.copy(fontSize = 18.sp), color = SharkLabel)
+                                Text(if(isListening) "Listening..." else if (isThinking) "Thinking..." else "Ready to help", color = SharkGold, style = SharkTypography.labelMedium)
                             }
                         }
                         IconButton(onClick = { chatOpen = false }) { Icon(Icons.Default.Close, null, tint = SharkSecondary) }
@@ -375,10 +582,9 @@ fun HomeScreen(
                         items(chatMessages) { msg ->
                             ChatBubble(msg)
                         }
-                        if (isThinking) { item { Text("Shark is typing...", color = SharkSecondary, fontSize = 12.sp) } }
+                        if (isThinking) { item { Text("Shark is typing...", color = SharkSecondary, style = SharkTypography.labelMedium) } }
                     }
 
-                    // Input Bar
                     Row(Modifier.fillMaxWidth().padding(16.dp).navigationBarsPadding(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextField(
                             value = textInputVal,
@@ -428,7 +634,7 @@ fun ChatBubble(msg: SharkChatMessage) {
                 .background(if(msg.isShark) SharkSurface else SharkGold)
                 .padding(12.dp)
         ) {
-            Text(msg.text, color = if(msg.isShark) SharkLabel else SharkBg, fontSize = 14.sp)
+            Text(msg.text, color = if(msg.isShark) SharkLabel else SharkBg, style = SharkTypography.bodyMedium)
         }
     }
 }
@@ -461,21 +667,21 @@ fun ToolkitTile(tile: EnvironmentTile, modifier: Modifier, onClick: () -> Unit) 
                 }
                 if(tile.tag.isNotEmpty()) {
                     Box(Modifier.clip(RoundedCornerShape(8.dp)).background(tile.tagBg).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                        Text(tile.tag, fontSize = 8.sp, fontWeight = FontWeight.Bold, color = tile.tagText)
+                        Text(tile.tag, style = SharkTypography.labelSmall, color = tile.tagText)
                     }
                 }
             }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(tile.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = SharkLabel, modifier = Modifier.weight(1f))
+                Text(tile.name, style = SharkTypography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = SharkLabel, modifier = Modifier.weight(1f))
                 if (tile.trendPoints.isNotEmpty()) MiniTrendLine(tile.trendPoints, tile.accentColor, Modifier.size(38.dp, 16.dp))
             }
             Spacer(Modifier.height(8.dp))
             Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(SharkBg.copy(0.5f)).padding(8.dp)) {
                 Column {
-                    Text(tile.liveLabel, fontSize = 7.sp, fontWeight = FontWeight.Bold, color = SharkSecondary)
-                    Text(tile.liveValue, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = SharkLabel)
-                    if(tile.liveSubValue.isNotEmpty()) Text(tile.liveSubValue, fontSize = 10.sp, color = SharkSecondary)
+                    Text(tile.liveLabel, style = SharkTypography.labelSmall, color = SharkSecondary)
+                    Text(tile.liveValue, style = SharkTypography.bodyLarge.copy(fontWeight = FontWeight.Bold), color = SharkLabel)
+                    if(tile.liveSubValue.isNotEmpty()) Text(tile.liveSubValue, style = SharkTypography.labelMedium, color = SharkSecondary)
                 }
             }
         }
@@ -500,11 +706,11 @@ fun MiniTrendLine(points: List<Float>, color: Color, modifier: Modifier) {
 @Composable
 fun WidgetMiniBar(label: String, fill: Float, color: Color, amount: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = SharkSecondary, modifier = Modifier.width(20.dp))
-        Box(Modifier.width(80.dp).height(6.dp).clip(CircleShape).background(SharkBg)) {
+        Text(label, style = SharkTypography.labelSmall, modifier = Modifier.width(20.dp))
+        Box(Modifier.weight(1f).height(6.dp).clip(CircleShape).background(SharkBg)) {
             Box(Modifier.fillMaxHeight().fillMaxWidth(fill.coerceIn(0f, 1f)).background(color, CircleShape))
         }
-        Text(amount, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = SharkLabel)
+        Text(amount, style = SharkTypography.labelSmall, color = SharkLabel)
     }
 }
 
@@ -536,6 +742,6 @@ fun SFBottomNav(onMicTap: () -> Unit, onMicHold: () -> Unit, isListening: Boolea
 fun NavIcon(icon: ImageVector, label: String, active: Boolean, onClick: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onClick() }) {
         Icon(icon, null, tint = if(active) SharkGold else SharkTertiary, modifier = Modifier.size(24.dp))
-        Text(label, fontSize = 10.sp, color = if(active) SharkGold else SharkTertiary, fontWeight = if(active) FontWeight.Bold else FontWeight.Normal)
+        Text(label, style = if(active) SharkTypography.labelSmall.copy(color = SharkGold) else SharkTypography.labelSmall.copy(color = SharkTertiary, fontWeight = FontWeight.Normal))
     }
 }
