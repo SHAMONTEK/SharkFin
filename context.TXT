@@ -1,0 +1,65 @@
+SHARKFIN APP CAPABILITIES & LIMITATIONS (v1.0)
+=====================================================
+
+WHAT THIS APP DOES (ACCURATE LIST):
+----------------------------------
+1.  **AI VOICE & TEXT COACH (Sharkie)**
+    - You can talk or type to the app like a person (e.g., "Spent $15 at Starbucks").
+    - It automatically figures out the amount, the store, and the category.
+    - It logs your spending or income directly into your records without you filling out forms.
+    - It can handle "slang" like "fifty bucks" or "a hundy."
+
+2.  **FINANCIAL "HEALTH" SCORE**
+    - Gives you a 0-100 "Money Score" based on how well you save vs. spend.
+    - The Shark mascot changes its mood (Happy, Hungry, Curious, Concerned) based on your score.
+
+3.  **EXPENSE & INCOME TRACKING**
+    - Tracks every dollar coming in and going out.
+    - Categorizes spending (Food, Transport, Bills, etc.).
+    - Syncs everything to the cloud (Firebase) so your data is saved.
+
+4.  **BILL & SUBSCRIPTION TRACKING**
+    - Tracks recurring bills like Rent, Netflix, or Utilities.
+    - Shows you exactly when they are due and if you've paid them.
+    - Calculates how much of your "daily budget" is eaten up by these bills.
+
+5.  **GOAL TRACKING**
+    - Lets you set savings goals (e.g., "New Car" or "Emergency Fund").
+    - Shows a percentage bar of how close you are to finishing.
+
+6.  **FREEDOM RUNWAY**
+    - Calculates exactly how many days you could survive without working, based on your current cash and spending habits.
+
+7.  **INVESTMENT & DIVIDEND TRACKING**
+    - Tracks your passive income from stocks or dividends.
+    - Compares your personal portfolio growth against the S&P 500 market.
+    - "Passive Snowball" shows you which bills your dividends are now paying for.
+
+8.  **TAX ESTIMATION**
+    - Estimates how much tax you might owe based on your 1099 or side-hustle income.
+
+9.  **DEBT MANAGEMENT**
+    - Tracks your total debt and helps you visualize paying it off.
+
+
+WHAT THIS APP DOES NOT DO (LIMITATIONS):
+---------------------------------------
+1.  **NO DIRECT BANK LINKING (PLAID)**
+    - It CANNOT log into your Chase, BoA, or Wells Fargo account automatically.
+    - You must tell the AI what you spent or import a statement manually.
+
+2.  **NO ACTUAL STOCK TRADING**
+    - It tracks stock prices and your portfolio value, but you CANNOT buy or sell stocks inside the app.
+
+3.  **NO AUTOMATIC BILL PAY**
+    - It reminds you to pay bills, but it CANNOT take money from your bank and pay the electric company for you.
+
+4.  **NO REAL-TIME FRAUD ALERTS**
+    - Since it's not connected to your live bank feed, it can't warn you if a stranger swipes your card.
+
+5.  **NO PHYSICAL CARDS**
+    - This is a software tracker only; there is no SharkFin debit or credit card.
+
+SUMMARY:
+--------
+SharkFin is a "Manual-Input Powerhouse." It uses AI to make tracking your money as fast as sending a text, giving you "CFO-level" insights (Score, Runway, Snowball) that basic banking apps don't provide.

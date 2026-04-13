@@ -241,7 +241,21 @@ object AICoachNLP {
         currentSession  : SharkAgentSession = SharkAgentSession.IDLE
     ): ParsedTransaction {
 
-        val input = normalizeFinancialSlang(rawInput.lowercase().trim())
+        // AUTO-CORRECT / SLURRY SPEECH FIXES
+        var input = rawInput.lowercase().trim()
+        val speechFixes = mapOf(
+            "sharky" to "sharkie", "shirley" to "sharkie", "sharpie" to "sharkie", "shirk" to "sharkie",
+            "siri" to "sharkie", "series" to "sharkie", "sear" to "sharkie", "shark" to "sharkie",
+            "summarize" to "summarize", "summer" to "summarize", "summary" to "summarize",
+            "imports" to "imports", "important" to "imports", "imported" to "imports", "reporting" to "imports",
+            "bill" to "bill", "build" to "bill", "pill" to "bill", "bell" to "bill",
+            "afford" to "afford", "effort" to "afford", "a ford" to "afford",
+            "score" to "score", "store" to "score", "door" to "score",
+            "food" to "food", "foot" to "food", "fluid" to "food", "dude" to "food"
+        )
+        speechFixes.forEach { (bad, good) -> input = input.replace(bad, good) }
+        
+        input = normalizeFinancialSlang(input)
         val (amt, tip, sec) = extractDetailedAmounts(input)
         
         val isCorrection = detectCorrectionIntent(input)
@@ -249,12 +263,22 @@ object AICoachNLP {
         val isIncome = (INCOME_SIGNALS.any { input.contains(it) } || isHustle)
         val isExpense = EXPENSE_SIGNALS.any { input.contains(it) }
         val isDebt = listOf("debt", "loan", "card").any { input.contains(it) } && isExpense
+        
+        // SPECIAL CASE: Demo Prompts (Fuzzy matching for summary/bills/afford)
+        val isSummaryReq = input.contains("summarize") || input.contains("recent") || input.contains("import")
+        val isBillReq = input.contains("bill") || input.contains("due") || input.contains("when")
+        val isAffordReq = input.contains("afford") || input.contains("can i") || input.contains("spend") || input.contains("buy")
+        val isScoreReq = input.contains("improve") || input.contains("score") || input.contains("better") || input.contains("health")
+        val isFoodReq = input.contains("food") || input.contains("dining") || input.contains("spent") || input.contains("eat")
+        
+        val isDemoQuery = isSummaryReq || isBillReq || isAffordReq || isScoreReq || isFoodReq || input.contains("trajectory") || input.contains("burn") || input.contains("runway")
 
         val recurringKey = matchRecurringBill(input, knownRecurring)
         val merchant = extractDynamicMerchant(input)
         val duration = extractWorkDuration(input)
 
         val intent = when {
+            isDemoQuery  -> TransactionIntent.UNCLEAR // Let Gemini handle the text, but flag it
             isCorrection -> TransactionIntent.CORRECTION
             isHustle     -> TransactionIntent.HUSTLE_INCOME
             isIncome     -> TransactionIntent.INCOME
@@ -267,14 +291,15 @@ object AICoachNLP {
 
         val tempParsed = ParsedTransaction(
             intent = intent, amount = amt, category = "Other", merchantHint = merchant,
-            tipAmount = tip, rawInput = rawInput, confidence = 0f, secondaryAmount = sec,
+            tipAmount = tip, rawInput = rawInput, confidence = if (isDemoQuery) 0.9f else 0f, 
+            secondaryAmount = sec,
             taxWithholding = if (isHustle && amt != null) amt * 0.20 else null,
             durationHours = duration, recurringKey = recurringKey,
             amountIsApprox = APPROX_SIGNALS.any { input.contains(it) }
         )
 
-        val finalConfidence = calculateStrictConfidence(tempParsed, input)
-        val needsConfirm = finalConfidence < 0.75f || amt == null || intent == TransactionIntent.UNCLEAR
+        val finalConfidence = if (isDemoQuery) 0.95f else calculateStrictConfidence(tempParsed, input)
+        val needsConfirm = if (isDemoQuery) false else (finalConfidence < 0.75f || amt == null || intent == TransactionIntent.UNCLEAR)
 
         return tempParsed.copy(
             confidence = finalConfidence,

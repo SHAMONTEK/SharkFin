@@ -36,16 +36,22 @@ import androidx.compose.ui.graphics.drawscope.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import androidx.core.content.ContextCompat
 import com.airbnb.lottie.compose.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.Calendar
@@ -89,11 +95,30 @@ fun HomeScreen(
     val incomeCategories = SharkIncomeCategories
 
     // ── FINANCIAL DATA PREP ───────────────────────────────────────────────────
+    fun isThisMonth(date: Date): Boolean {
+        val cal1 = Calendar.getInstance()
+        val cal2 = Calendar.getInstance().apply { time = date }
+        return cal1.get(Calendar.MONTH) == cal2.get(Calendar.MONTH) &&
+                cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR)
+    }
+
     val wizardIncome = (discoveryData?.get("monthlyIncome") as? Double) ?: 0.0
     val wizardObligations = (discoveryData?.get("monthlyObligations") as? Double) ?: 0.0
-    val totalIncome = incomeSources.sumOf { it.amount }.coerceAtLeast(wizardIncome)
+    
+    // Better Income Logic: Max of Planned Sources, Wizard Input, or Actual Logged Income this month
+    val loggedMonthlyIncome = expenses.filter { isThisMonth(it.createdAtDate) && it.category in incomeCategories }.sumOf { it.amount }
+    val totalIncome = listOf(incomeSources.sumOf { it.amount }, wizardIncome, loggedMonthlyIncome).maxOrNull() ?: 0.0
+    
     val totalSpent = expenses.filter { it.category !in incomeCategories }.sumOf { it.amount }
-    val balance = expenses.filter { it.category in incomeCategories }.sumOf { it.amount } - totalSpent
+    val totalIncomeAllTime = expenses.filter { it.category in incomeCategories }.sumOf { it.amount }
+    
+    // If no income has ever been logged, but the user says they have a balance, 
+    // we should trust the Wizard's implied balance or at least show what's there.
+    val balance = if (totalIncomeAllTime > 0 || totalSpent > 0) {
+        totalIncomeAllTime - totalSpent
+    } else {
+        wizardIncome // Fallback to wizard income if no transactions exist yet
+    }
 
     fun isToday(date: Date): Boolean {
         val cal1 = Calendar.getInstance()
@@ -103,14 +128,20 @@ fun HomeScreen(
     }
 
     val spentToday = expenses.filter { isToday(it.createdAtDate) && it.category !in incomeCategories }.sumOf { it.amount }
-    val dailyBudget = if (totalIncome > 0) totalIncome / 30.0 else 0.0
+    val dailyBudget = if (totalIncome > 0) totalIncome / 30.0 else (balance / 30.0).coerceAtLeast(0.0)
     val totalObligations = bills.sumOf { it.amount } + debts.sumOf { it.minimumPayment } + recurringBills.sumOf { it.amount }
     val maxObligations = totalObligations.coerceAtLeast(wizardObligations)
 
-    val spendableTodayMax = ((dailyBudget - (maxObligations / 30.0)) * 0.20).coerceAtLeast(0.0)
+    // Protection logic: If user has a large balance but no income, we allow spending based on balance runway
+    val spendableTodayMax = if (totalIncome > 0) {
+        ((dailyBudget - (maxObligations / 30.0)) * 0.20).coerceAtLeast(5.0) // Floor of $5 if they have income
+    } else if (balance > 0) {
+        (balance / 30.0) * 0.10 // 10% of daily balance if no monthly income set
+    } else 0.0
+
     val spendableLeft = (spendableTodayMax - spentToday).coerceAtLeast(0.0)
     val passiveIncome = expenses.filter { it.category == "Passive Income" }.sumOf { it.amount }
-    val avgDailyBurn = if (expenses.isNotEmpty()) totalSpent / 30.0 else (maxObligations / 30.0)
+    val avgDailyBurn = if (expenses.isNotEmpty() && totalSpent > 0) totalSpent / 30.0 else (maxObligations / 30.0).coerceAtLeast(10.0)
 
     val score = calcMoneyScore(
         income = totalIncome, spent = totalSpent, bills = bills,
@@ -121,14 +152,22 @@ fun HomeScreen(
     val firstName = displayName.split(" ").firstOrNull()?.ifBlank { "Shark" } ?: "Shark"
 
     // ── AI AGENT STATE ───────────────────────────────────────────────────────
+    val sharkAssistant = remember {
+        SharkAssistant(
+            apiKey = "AIzaSyAPeEbQEPyln6zSP3irUtOPM3XjjpmuIY0",
+            uid = uid,
+            db = db
+        )
+    }
+
     var chatOpen by remember { mutableStateOf(false) }
     var chatMessages by remember { mutableStateOf(listOf<SharkChatMessage>()) }
     var isListening by remember { mutableStateOf(false) }
     var liveTranscript by remember { mutableStateOf("") }
     var isThinking by remember { mutableStateOf(false) }
-    var currentSession by remember { mutableStateOf(SharkAgentSession.IDLE) }
-    var awaitingConfirm by remember { mutableStateOf<ParsedTransaction?>(null) }
     var textInputVal by remember { mutableStateOf("") }
+    val chatListState = rememberLazyListState()
+    val focusRequester = remember { FocusRequester() }
 
     val financialState = SharkFinancialState(
         dailyBudget = dailyBudget,
@@ -146,49 +185,36 @@ fun HomeScreen(
         totalDebt = debts.sumOf { it.currentBalance }
     )
 
-    fun logParsedTransaction(parsed: ParsedTransaction) {
-        if (parsed.amount != null) {
-            val expenseData = hashMapOf(
-                "title"     to (parsed.merchantHint ?: parsed.category),
-                "amount"    to parsed.amount,
-                "category"  to parsed.category,
-                "note"      to parsed.rawInput,
-                "createdAt" to Date()
-            )
-            db.collection("users").document(uid).collection("expenses").add(expenseData)
+    LaunchedEffect(financialState) {
+        sharkAssistant.updateSystemContext(financialState)
+    }
+
+    LaunchedEffect(chatMessages.size) {
+        if (chatMessages.isNotEmpty()) {
+            chatListState.animateScrollToItem(chatMessages.size - 1)
         }
     }
 
-    fun processVoiceInput(input: String) {
+    fun processChatInput(input: String) {
         if (input.isBlank()) return
+        val currentInput = input.trim()
+        textInputVal = "" // Clear immediately to prevent double-sends
+        
         scope.launch {
             isThinking = true
-            chatMessages = chatMessages + SharkChatMessage(input, isShark = false)
-            delay(1000)
+            chatMessages = chatMessages + SharkChatMessage(currentInput, isShark = false)
 
-            if (awaitingConfirm != null) {
-                if (input.lowercase().contains("yes") || input.lowercase().contains("yeah") || input.lowercase().contains("confirm")) {
-                    logParsedTransaction(awaitingConfirm!!)
-                    chatMessages = chatMessages + SharkChatMessage("Confirmed. Logged it.", isShark = true)
-                    awaitingConfirm = null
-                } else if (input.lowercase().contains("no") || input.lowercase().contains("cancel")) {
-                    chatMessages = chatMessages + SharkChatMessage("Cancelled. What else?", isShark = true)
-                    awaitingConfirm = null
+            try {
+                sharkAssistant.processInput(currentInput, financialState).collect { response ->
+                    chatMessages = chatMessages + SharkChatMessage(response.message, isShark = true)
+                    if (response.navigateTo != null) onFeatureClick(response.navigateTo)
                 }
+            } catch (e: Exception) {
+                chatMessages = chatMessages + SharkChatMessage("Turbulence in the deep. Try that again.", isShark = true)
+            } finally {
                 isThinking = false
-                return@launch
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
             }
-
-            val parsed = AICoachNLP.parse(input, financialState.knownRecurring, currentSession)
-            val response = AICoachResponse.generate(parsed, financialState)
-
-            chatMessages = chatMessages + SharkChatMessage(response.message, isShark = true)
-            isThinking = false
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-
-            if (response.navigateTo != null) onFeatureClick(response.navigateTo)
-            if (parsed.needsConfirm || response.askFollowUp != null) awaitingConfirm = parsed
-            if (response.logTransaction && parsed.amount != null && !parsed.needsConfirm) logParsedTransaction(parsed)
         }
     }
 
@@ -198,25 +224,45 @@ fun HomeScreen(
         Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         }
     }
 
     val recognitionListener = object : RecognitionListener {
-        override fun onReadyForSpeech(params: Bundle?) {}
-        override fun onBeginningOfSpeech() { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+        override fun onReadyForSpeech(params: Bundle?) { 
+            isListening = true 
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+        override fun onBeginningOfSpeech() { }
         override fun onRmsChanged(rmsdB: Float) {}
         override fun onBufferReceived(buffer: ByteArray?) {}
-        override fun onEndOfSpeech() { isListening = false }
-        override fun onError(error: Int) { isListening = false; liveTranscript = "" }
+        override fun onEndOfSpeech() { 
+            isListening = false 
+        }
+        override fun onError(error: Int) { 
+            isListening = false 
+            liveTranscript = ""
+            // Handle error silently or with a subtle vibration
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
         override fun onResults(results: Bundle?) {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-            if (!matches.isNullOrEmpty()) { processVoiceInput(matches[0]) }
+            if (!matches.isNullOrEmpty()) { 
+                val text = matches[0]
+                processChatInput(text) 
+            }
             liveTranscript = ""
+            isListening = false
         }
         override fun onPartialResults(partialResults: Bundle?) {
             val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-            if (!matches.isNullOrEmpty()) { liveTranscript = matches[0] }
+            if (!matches.isNullOrEmpty()) { 
+                liveTranscript = matches[0] 
+                // Don't overwrite the user's manual typing if they are in the middle of it
+                if (textInputVal.isEmpty() || isListening) {
+                    textInputVal = matches[0]
+                }
+            }
         }
         override fun onEvent(eventType: Int, params: Bundle?) {}
     }
@@ -227,14 +273,28 @@ fun HomeScreen(
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-        if (isGranted) { isListening = true; speechRecognizer.startListening(recognizerIntent) }
+        if (isGranted) { 
+            speechRecognizer.startListening(recognizerIntent) 
+        } else {
+            Toast.makeText(context, "Microphone permission needed for Sharkie", Toast.LENGTH_SHORT).show()
+        }
     }
 
-    fun startListening() {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+    fun toggleListening() {
+        if (isListening) {
+            speechRecognizer.stopListening()
+            isListening = false
         } else {
-            isListening = true; speechRecognizer.startListening(recognizerIntent)
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            } else {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                // Add a 200ms delay to avoid picking up the tap sound ("first/second taps")
+                scope.launch {
+                    delay(250)
+                    speechRecognizer.startListening(recognizerIntent)
+                }
+            }
         }
     }
 
@@ -247,6 +307,9 @@ fun HomeScreen(
         spendableLeft <= 0 -> SharkMood.CONCERNED
         else            -> SharkMood.NEUTRAL
     }
+
+    var showProfileSettings by remember { mutableStateOf(false) }
+    var tempDisplayName by remember { mutableStateOf(displayName) }
 
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.cute_shark_animation))
     val moodClip = when (sharkMood) {
@@ -275,6 +338,14 @@ fun HomeScreen(
         EnvironmentTile("Settings", "Settings", Icons.Default.Settings, SharkSecondary, SharkSurface, true, liveLabel = "PROFILE", liveValue = firstName, liveSubValue = accountType)
     )
 
+    fun onTileClick(id: String) {
+        if (id == "Settings") {
+            showProfileSettings = true
+        } else {
+            onFeatureClick(id)
+        }
+    }
+
     val scoreColor = when { score >= 70 -> SharkGold; score >= 40 -> SharkAmber; else -> SharkRed }
     val animatedScore by animateFloatAsState(score.toFloat(), tween(1000), label = "score")
     val arcSweep by animateFloatAsState((score / 100f) * 240f, tween(1200, easing = EaseOutCubic), label = "arc")
@@ -289,6 +360,32 @@ fun HomeScreen(
                     Column(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 60.dp, bottom = 10.dp)) {
                         Text("SHARKFIN: FINANCE PORTFOLIO", fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, color = SharkGold.copy(0.6f))
                         Text("Hey, $firstName", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = SharkLabel, letterSpacing = (-0.5).sp)
+
+                        Spacer(Modifier.height(16.dp))
+                        // ── NEW TEXT INPUT ENTRY BAR ──
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                                .clip(RoundedCornerShape(25.dp))
+                                .background(SharkSurface)
+                                .border(0.5.dp, SharkCardBorder, RoundedCornerShape(25.dp))
+                                .clickable { 
+                                    chatOpen = true 
+                                    scope.launch { 
+                                        delay(300)
+                                        focusRequester.requestFocus() 
+                                    }
+                                }
+                                .padding(horizontal = 16.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.ChatBubbleOutline, null, tint = SharkGold, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(12.dp))
+                                Text("Ask Sharkie anything...", color = SharkTertiary, fontSize = 14.sp)
+                            }
+                        }
                     }
                 }
 
@@ -345,7 +442,7 @@ fun HomeScreen(
                 items(toolkitTiles.chunked(2)) { pair ->
                     Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp), Arrangement.spacedBy(12.dp)) {
                         pair.forEach { tile ->
-                            ToolkitTile(tile, Modifier.weight(1f)) { if(tile.available) onFeatureClick(tile.id) }
+                            ToolkitTile(tile, Modifier.weight(1f)) { if(tile.available) onTileClick(tile.id) }
                         }
                         if(pair.size == 1) Spacer(Modifier.weight(1f))
                     }
@@ -353,68 +450,296 @@ fun HomeScreen(
             }
         }
 
-        // ── CHAT OVERLAY ─────────────────────────────────────────────────────
-        AnimatedVisibility(chatOpen, enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut()) {
-            Box(Modifier.fillMaxSize().background(SharkBg)) {
-                Column(Modifier.fillMaxSize().padding(top = 50.dp)) {
-                    Row(Modifier.fillMaxWidth().padding(16.dp), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Box(Modifier.size(60.dp), Alignment.Center) {
-                                LottieAnimation(composition, { lottieProgress }, modifier = Modifier.fillMaxSize())
-                            }
-                            Column {
-                                Text("Sharkie AI", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = SharkLabel)
-                                Text(if(isListening) "Listening..." else if (isThinking) "Thinking..." else "Ready to help", color = SharkGold, fontSize = 12.sp)
+    val suggestedPrompts = listOf(
+        "Summarize my recent imports",
+        "When is my next bill due?",
+        "Can I afford to spend $50?",
+        "How do I improve my score?",
+        "How much spent on food today?",
+        "Analyze my spending trajectory"
+    )
+
+    // ── CHAT OVERLAY ─────────────────────────────────────────────────────
+    AnimatedVisibility(
+        chatOpen,
+        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(SharkBg.copy(0.95f))
+        ) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .padding(top = 40.dp)
+            ) {
+                // Sophisticated Header
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                    Arrangement.SpaceBetween,
+                    Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Box(
+                            Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(SharkSurface)
+                                .border(1.dp, SharkGold.copy(0.3f), CircleShape),
+                            Alignment.Center
+                        ) {
+                            LottieAnimation(composition, { lottieProgress }, modifier = Modifier.size(44.dp))
+                        }
+                        Column {
+                            Text("Sharkie AI", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = SharkLabel, letterSpacing = (-0.5).sp)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Box(Modifier.size(6.dp).background(if(isThinking || isListening) SharkGold else Color(0xFF4CAF50), CircleShape))
+                                Text(
+                                    if(isListening) "Listening..." else if (isThinking) "Calculating..." else "Online",
+                                    color = if(isListening) SharkGold else SharkSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
                         }
-                        IconButton(onClick = { chatOpen = false }) { Icon(Icons.Default.Close, null, tint = SharkSecondary) }
                     }
-                    HorizontalDivider(color = SharkCardBorder)
-                    
-                    LazyColumn(Modifier.weight(1f).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    IconButton(
+                        onClick = { chatOpen = false },
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(SharkSurface)
+                    ) {
+                        Icon(Icons.Default.Close, null, tint = SharkLabel, modifier = Modifier.size(20.dp))
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+                HorizontalDivider(color = SharkCardBorder.copy(0.5f), thickness = 0.5.dp)
+                
+                LazyColumn(
+                    state = chatListState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 16.dp), 
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(top = 20.dp, bottom = 120.dp)
+                ) {
+                    if (chatMessages.isEmpty()) {
+                        item {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(top = 40.dp)) {
+                                Text(
+                                    "THE DEEP KNOWS ALL",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = SharkGold.copy(0.4f),
+                                    letterSpacing = 3.sp
+                                )
+                                Spacer(Modifier.height(12.dp))
+                                Text(
+                                    "How can I sharpen your finances today?",
+                                    color = SharkLabel,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(Modifier.height(32.dp))
+                                
+                                Text("SUGGESTED PROMPTS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = SharkTertiary, letterSpacing = 1.5.sp)
+                                Spacer(Modifier.height(16.dp))
+                                
+                                suggestedPrompts.forEach { prompt ->
+                                    Box(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 6.dp)
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .background(SharkSurface)
+                                            .border(1.dp, SharkCardBorder, RoundedCornerShape(16.dp))
+                                            .clickable { 
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                processChatInput(prompt) 
+                                            }
+                                            .padding(18.dp)
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.Bolt, null, tint = SharkGold, modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(12.dp))
+                                            Text(prompt, color = SharkLabel, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
                         items(chatMessages) { msg ->
                             ChatBubble(msg)
                         }
-                        if (isThinking) { item { Text("Shark is typing...", color = SharkSecondary, fontSize = 12.sp) } }
                     }
+                }
 
-                    // Input Bar
-                    Row(Modifier.fillMaxWidth().padding(16.dp).navigationBarsPadding(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextField(
-                            value = textInputVal,
-                            onValueChange = { textInputVal = it },
-                            modifier = Modifier.weight(1f),
-                            placeholder = { Text("Ask anything...", color = SharkTertiary) },
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = SharkSurface,
-                                unfocusedContainerColor = SharkSurface,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                focusedTextColor = SharkLabel
-                            ),
-                            shape = RoundedCornerShape(24.dp),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                            keyboardActions = KeyboardActions(onSend = {
-                                processVoiceInput(textInputVal)
-                                textInputVal = ""
-                            })
-                        )
-                        FloatingActionButton(onClick = { startListening() }, containerColor = SharkGold, shape = CircleShape) {
-                            Icon(if(isListening) Icons.Default.Stop else Icons.Default.Mic, null, tint = SharkBg)
+                // Input Bar Container with Glassmorphism / Glow
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 120.dp) // Raised even higher as requested
+                        .navigationBarsPadding()
+                        .imePadding()
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .shadow(24.dp, RoundedCornerShape(30.dp), spotColor = SharkGold),
+                        color = SharkSurface.copy(0.9f),
+                        shape = RoundedCornerShape(30.dp),
+                        border = BorderStroke(1.5.dp, Brush.sweepGradient(listOf(SharkGold, SharkAmber, SharkGold)))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp), 
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextField(
+                                value = textInputVal,
+                                onValueChange = { textInputVal = it },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .focusRequester(focusRequester),
+                                placeholder = { Text("Command Sharkie...", color = SharkTertiary, fontSize = 15.sp) },
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                    focusedTextColor = SharkLabel,
+                                    unfocusedTextColor = SharkLabel,
+                                    cursorColor = SharkGold
+                                ),
+                                singleLine = false,
+                                maxLines = 4,
+                                textStyle = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Bold),
+                                keyboardOptions = KeyboardOptions(
+                                    imeAction = ImeAction.Send,
+                                    capitalization = KeyboardCapitalization.Sentences,
+                                    keyboardType = KeyboardType.Text
+                                ),
+                                keyboardActions = KeyboardActions(onSend = {
+                                    if (textInputVal.isNotBlank()) {
+                                        val capturedText = textInputVal
+                                        textInputVal = ""
+                                        processChatInput(capturedText)
+                                    }
+                                })
+                            )
+
+                            // Unified Action Button with Robust Effect
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        brush = if (isListening) Brush.verticalGradient(listOf(SharkRed, Color(0xFF990000)))
+                                                else if (textInputVal.isNotBlank()) Brush.verticalGradient(listOf(SharkGold, SharkAmber))
+                                                else Brush.verticalGradient(listOf(SharkSurfaceHigh, SharkSurface))
+                                    )
+                                    .border(1.dp, if(isListening || textInputVal.isNotBlank()) SharkWhite.copy(0.3f) else SharkCardBorder, CircleShape)
+                                    .clickable {
+                                        if (textInputVal.isNotBlank()) {
+                                            val capturedText = textInputVal
+                                            textInputVal = ""
+                                            processChatInput(capturedText)
+                                        } else {
+                                            toggleListening()
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isThinking) {
+                                    CircularProgressIndicator(modifier = Modifier.size(22.dp), color = SharkBg, strokeWidth = 3.dp)
+                                } else {
+                                    val icon = when {
+                                        textInputVal.isNotBlank() -> Icons.AutoMirrored.Filled.Send
+                                        isListening -> Icons.Default.Stop
+                                        else -> Icons.Default.Mic
+                                    }
+                                    Icon(
+                                        icon, 
+                                        null, 
+                                        tint = if (textInputVal.isNotBlank() || isListening) SharkBg else SharkGold, 
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    // PROFILE SETTINGS MODAL
+    if (showProfileSettings) {
+        AlertDialog(
+            onDismissRequest = { showProfileSettings = false },
+            containerColor = SharkSurface,
+            title = { Text("Profile Settings", color = SharkLabel) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text("Change your display name so Sharkie knows who to bark at.", color = SharkSecondary, fontSize = 14.sp)
+                    OutlinedTextField(
+                        value = tempDisplayName,
+                        onValueChange = { tempDisplayName = it },
+                        label = { Text("Display Name", color = SharkGold) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = SharkGold,
+                            unfocusedBorderColor = SharkCardBorder,
+                            focusedTextColor = SharkLabel,
+                            unfocusedTextColor = SharkLabel
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { 
+                    db.collection("users").document(uid).update("displayName", tempDisplayName)
+                    showProfileSettings = false 
+                }) {
+                    Text("SAVE", color = SharkGold, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showProfileSettings = false }) {
+                    Text("CANCEL", color = SharkSecondary)
+                }
+            }
+        )
+    }
 
         // BOTTOM NAV
         Box(Modifier.align(Alignment.BottomCenter)) {
             SFBottomNav(
-                onMicTap = { chatOpen = true },
-                onMicHold = { chatOpen = true; startListening() },
+                onMicTap = { 
+                    if (!chatOpen) chatOpen = true
+                    toggleListening() 
+                },
+                onMicHold = { 
+                    if (!chatOpen) chatOpen = true
+                    toggleListening() 
+                },
                 isListening = isListening,
                 micScale = 1f,
-                onFeatureClick = onFeatureClick
+                onFeatureClick = { feature ->
+                    chatOpen = false
+                    onFeatureClick(feature)
+                },
+                onHomeClick = {
+                    chatOpen = false
+                }
             )
         }
     }
@@ -422,13 +747,94 @@ fun HomeScreen(
 
 @Composable
 fun ChatBubble(msg: SharkChatMessage) {
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = if(msg.isShark) Alignment.Start else Alignment.End) {
-        Box(
-            Modifier.clip(RoundedCornerShape(16.dp))
-                .background(if(msg.isShark) SharkSurface else SharkGold)
-                .padding(12.dp)
+    val isShark = msg.isShark
+    var visible by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(Unit) {
+        visible = true
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(400)) + 
+                slideInHorizontally(initialOffsetX = { if (isShark) -20 else 20 }) +
+                expandVertically(expandFrom = Alignment.Top),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 6.dp), 
+            horizontalAlignment = if(isShark) Alignment.Start else Alignment.End
         ) {
-            Text(msg.text, color = if(msg.isShark) SharkLabel else SharkBg, fontSize = 14.sp)
+            if (isShark) {
+                Row(
+                    verticalAlignment = Alignment.Top, 
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth(0.85f)
+                ) {
+                    Box(
+                        Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(SharkSurface)
+                            .border(1.dp, SharkGold.copy(0.4f), CircleShape),
+                        Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Waves, null, tint = SharkGold, modifier = Modifier.size(16.dp))
+                    }
+                    Column {
+                        Box(
+                            Modifier
+                                .clip(RoundedCornerShape(0.dp, 20.dp, 20.dp, 20.dp))
+                                .background(SharkSurfaceHigh)
+                                .shadow(8.dp, RoundedCornerShape(0.dp, 20.dp, 20.dp, 20.dp), spotColor = SharkGold.copy(0.2f))
+                                .border(0.5.dp, SharkCardBorder, RoundedCornerShape(0.dp, 20.dp, 20.dp, 20.dp))
+                                .padding(horizontal = 16.dp, vertical = 14.dp)
+                        ) {
+                            Text(
+                                msg.text, 
+                                color = SharkLabel, 
+                                fontSize = 15.sp, 
+                                lineHeight = 22.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            SimpleDateFormat("h:mm a", Locale.US).format(Date(msg.timestamp)),
+                            fontSize = 9.sp,
+                            color = SharkTertiary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.End, modifier = Modifier.fillMaxWidth(0.85f).align(Alignment.End)) {
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(20.dp, 20.dp, 0.dp, 20.dp))
+                            .background(Brush.linearGradient(listOf(SharkGold, SharkAmber)))
+                            .border(0.5.dp, SharkWhite.copy(0.2f), RoundedCornerShape(20.dp, 20.dp, 0.dp, 20.dp))
+                            .padding(horizontal = 16.dp, vertical = 14.dp)
+                    ) {
+                        Text(
+                            msg.text, 
+                            color = SharkBg, 
+                            fontSize = 15.sp, 
+                            fontWeight = FontWeight.Bold, 
+                            lineHeight = 22.sp
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Delivered",
+                        fontSize = 9.sp,
+                        color = SharkTertiary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
     }
 }
@@ -509,21 +915,38 @@ fun WidgetMiniBar(label: String, fill: Float, color: Color, amount: String) {
 }
 
 @Composable
-fun SFBottomNav(onMicTap: () -> Unit, onMicHold: () -> Unit, isListening: Boolean, micScale: Float, onFeatureClick: (String) -> Unit) {
+fun SFBottomNav(
+    onMicTap: () -> Unit, 
+    onMicHold: () -> Unit, 
+    isListening: Boolean, 
+    micScale: Float, 
+    onFeatureClick: (String) -> Unit,
+    onHomeClick: () -> Unit = {}
+) {
     Box(Modifier.fillMaxWidth().background(SharkSurface).padding(bottom = 20.dp)) {
         HorizontalDivider(Modifier.align(Alignment.TopCenter), color = SharkCardBorder)
         Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), Arrangement.SpaceAround, Alignment.CenterVertically) {
-            NavIcon(Icons.Default.Home, "Home", true) {}
+            NavIcon(Icons.Default.Home, "Home", true) { onHomeClick() }
             NavIcon(Icons.Default.GridView, "Features", false) { onFeatureClick("Features") }
             Box(contentAlignment = Alignment.Center) {
-                if (isListening) Box(Modifier.size(74.dp).border(2.dp, SharkGold.copy(0.3f), CircleShape).scale(1.2f))
+                // Pulse effect when listening
+                if (isListening) {
+                    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                    val pulseScale by infiniteTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 1.4f,
+                        animationSpec = infiniteRepeatable(tween(1000), RepeatMode.Reverse),
+                        label = "scale"
+                    )
+                    Box(Modifier.size(70.dp).scale(pulseScale).background(SharkGold.copy(0.2f), CircleShape))
+                }
+                
                 Box(
-                    Modifier.size(60.dp).clip(CircleShape).background(SharkGold)
-                        .clickable { onMicTap() }
-                        .pointerInput(Unit) { detectTapGestures(onLongPress = { onMicHold() }) },
+                    Modifier.size(64.dp).clip(CircleShape).background(if (isListening) SharkRed else SharkGold)
+                        .clickable { onMicTap() },
                     Alignment.Center
                 ) {
-                    Icon(Icons.Default.Mic, null, tint = SharkBg, modifier = Modifier.size(28.dp))
+                    Icon(if (isListening) Icons.Default.Stop else Icons.Default.Mic, null, tint = SharkBg, modifier = Modifier.size(32.dp))
                 }
             }
             NavIcon(Icons.AutoMirrored.Filled.ReceiptLong, "Activity", false) { onFeatureClick("Activity") }

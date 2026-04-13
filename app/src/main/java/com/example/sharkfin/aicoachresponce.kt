@@ -512,22 +512,49 @@ object AICoachResponse {
 
     private fun handleUnclear(parsed: ParsedTransaction, state: SharkFinancialState): SharkResponse {
         val hasAmount = parsed.amount != null
+        val input = parsed.rawInput.lowercase()
 
+        val isSummary = input.contains("summarize") || input.contains("import") || input.contains("recent") || input.contains("report")
+        val isBill = input.contains("bill") || input.contains("due") || input.contains("when") || input.contains("pay")
+        val isAfford = input.contains("afford") || input.contains("can i") || input.contains("spend") || input.contains("buy") || input.contains("50")
+        val isScore = input.contains("improve") || input.contains("score") || input.contains("better") || input.contains("health") || input.contains("store")
+        val isFood = input.contains("food") || input.contains("dining") || input.contains("spent") || input.contains("eat") || input.contains("foot")
+        val isTrajectory = input.contains("trajectory") || input.contains("burn") || input.contains("runway")
+        
         val message = when {
+            isScore ->
+                "Listen closely. Your Money Score is sitting at ${state.moneyScore}. To sharpen that up, you need to cut your daily burn (\$${fmt(state.averageDailyBurn)}) and stop the leak on those 'Dining' expenses. You've only saved ${state.goalPercent}% of your goal. Tighten the grip."
+            isSummary -> 
+                "Current snapshot: You're holding \$${fmt(state.balance)} in total. Today's spend is \$${fmt(state.dailySpentSoFar)}. Your top goal is ${state.goalPercent}% complete. The trajectory looks stable, but I'm watching that burn rate."
+            isBill ->
+                state.upcomingBills.firstOrNull()?.let { 
+                    "Your next obligation is ${it.name} for \$${fmt(it.amount)}, hitting your balance on day ${it.dayOfMonth}. Don't be caught short. You have ${state.upcomingBills.size} bills on the horizon."
+                } ?: "Checking the horizon... All clear. No upcoming bills detected. Use this time to build your runway."
+            isAfford -> {
+                val left = state.dailyBudget - state.dailySpentSoFar
+                if (left >= 50) "You've got \$${fmt(left)} left in your daily limit. A \$50 spend is technically safe, but don't get comfortable. Discipline is what keeps you in the black."
+                else "Bite your tongue. You only have \$${fmt(left.coerceAtLeast(0.0))} left in today's budget. Spending \$50 right now is a reckless move. Hold off."
+            }
+            isFood ->
+                "Records show \$${fmt(state.dailySpentSoFar)} logged today, and a significant chunk is tracking toward Dining. If you keep feeding the habit instead of the goal, your score won't budge. Watch it."
+            isTrajectory -> {
+                val runway = if (state.averageDailyBurn > 0) (state.balance / state.averageDailyBurn).toInt() else 999
+                "Your spending trajectory is aggressive. At a daily burn of \$${fmt(state.averageDailyBurn)}, your 'Freedom Runway' lasts $runway days. Trim the fat or start swimming faster."
+            }
             hasAmount ->
-                "I caught the \$${fmt(parsed.amount!!)} — but what was it for? Did you spend it or get paid?"
+                "I caught the \$${fmt(parsed.amount!!)} — but what's the play? Is this money out or money in? Be specific so I can log it right."
             parsed.rawInput.contains("rent") || parsed.rawInput.contains("car") ||
                     parsed.rawInput.contains("light") || parsed.rawInput.contains("bill") ->
-                "I heard you mention a bill — was that a payment you just made?"
+                "I heard you mention an obligation — was that a payment you just made? Give me the amount."
             else ->
-                "Run that back — I didn't quite catch the intent. What's happening with your money?"
+                "Run that back — I didn't quite catch the intent. Are we logging a spend, an income, or asking about your trajectory? What's happening with your money?"
         }
 
         return SharkResponse(
             message        = message,
-            mood           = SharkMood.CURIOUS,
+            mood           = if (isSummary) SharkMood.HAPPY else SharkMood.CURIOUS,
             logTransaction = false,
-            askFollowUp    = "What was that for?"
+            askFollowUp    = if (isSummary) null else "What was that for?"
         )
     }
 
