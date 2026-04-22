@@ -312,6 +312,7 @@ fun SharkFinDashboard(
                     "Passive Snowball" -> PassiveSnowballScreen(uid, db, expenses, bills)
                     "Debt Vanish"      -> DebtVanishScreen(uid, db, debts)
                     "Freedom Runway"   -> FreedomRunwayScreen(expenses, bills, discoveryData)
+                    "Market Terminal"  -> StockForexScreen(uid, db, portfolio)
                     "Account Settings" -> AccountSettingsScreen()
                     else               -> ComingSoonPlaceholder(openFeature!!)
                 }

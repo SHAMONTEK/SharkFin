@@ -1,6 +1,5 @@
 package com.example.sharkfin
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,18 +14,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.Date
-import java.util.Locale
+
+// --- UI Models ---
 
 data class MarketAsset(
     val symbol: String,
@@ -39,25 +36,27 @@ data class MarketAsset(
     val isLoading: Boolean = false
 )
 
+// --- Screen Component ---
+
 @Composable
 fun StockForexScreen(
     uid: String,
     db: FirebaseFirestore,
     portfolio: List<PortfolioAsset>
 ) {
-    val apiKey = "SCA27TYZQC1JJ5A0"
+    val apiKey = "SCDE285T91MJQSHQ"
     var showTutorial by remember { mutableStateOf(true) }
     var selectedAsset by remember { mutableStateOf<MarketAsset?>(null) }
     var showAddToPortfolio by remember { mutableStateOf<MarketAsset?>(null) }
-    
+
     var assets by remember { mutableStateOf(listOf(
         MarketAsset("AAPL", "Apple Inc."),
         MarketAsset("MSFT", "Microsoft"),
         MarketAsset("GOOGL", "Alphabet Inc."),
         MarketAsset("TSLA", "Tesla, Inc."),
         MarketAsset("NVDA", "NVIDIA Corp."),
-        MarketAsset("BTC", "Bitcoin"),
-        MarketAsset("ETH", "Ethereum"),
+        MarketAsset("BTC", "Bitcoin", isForex = true),
+        MarketAsset("ETH", "Ethereum", isForex = true),
         MarketAsset("EUR", "Euro / USD", isForex = true),
         MarketAsset("GBP", "Pound / USD", isForex = true),
         MarketAsset("JPY", "Yen / USD", isForex = true)
@@ -71,27 +70,31 @@ fun StockForexScreen(
             try {
                 if (asset.isForex) {
                     val response = MarketRetrofit.api.getForexRate(fromCurrency = asset.symbol, toCurrency = "USD", apiKey = apiKey)
-                    response.rate?.let { rate ->
-                        assets = assets.map { 
+                    if (response.rate != null) {
+                        assets = assets.map {
                             if (it.symbol == asset.symbol) it.copy(
-                                price = rate.price.toDoubleOrNull() ?: it.price,
-                                forexDetails = rate,
+                                price = response.rate.price.toDoubleOrNull() ?: it.price,
+                                forexDetails = response.rate,
                                 isLoading = false
-                            ) else it 
+                            ) else it
                         }
+                    } else {
+                        assets = assets.map { if (it.symbol == asset.symbol) it.copy(isLoading = false) else it }
                     }
                 } else {
-                    val symbol = if (asset.symbol == "BTC" || asset.symbol == "ETH") "${asset.symbol}USD" else asset.symbol
-                    val response = MarketRetrofit.api.getQuote(symbol = symbol, apiKey = apiKey)
-                    response.lastQuote?.let { quote ->
-                        assets = assets.map { 
+                    val response = MarketRetrofit.api.getQuote(symbol = asset.symbol, apiKey = apiKey)
+                    if (response.lastQuote != null) {
+                        val cleanPercent = response.lastQuote.changePercent.replace("%", "").toDoubleOrNull() ?: 0.0
+                        assets = assets.map {
                             if (it.symbol == asset.symbol) it.copy(
-                                price = quote.price.toDoubleOrNull() ?: it.price,
-                                change = quote.changePercent.replace("%", "").toDoubleOrNull() ?: it.change,
-                                details = quote,
+                                price = response.lastQuote.price.toDoubleOrNull() ?: it.price,
+                                change = cleanPercent,
+                                details = response.lastQuote,
                                 isLoading = false
-                            ) else it 
+                            ) else it
                         }
+                    } else {
+                        assets = assets.map { if (it.symbol == asset.symbol) it.copy(isLoading = false) else it }
                     }
                 }
             } catch (e: Exception) {
@@ -101,26 +104,31 @@ fun StockForexScreen(
     }
 
     LaunchedEffect(Unit) {
-        assets.forEach { refreshAsset(it) }
-        while(true) {
-            delay(300000) // Poll every 5 mins to stay within free tier limits
-            assets.forEach { refreshAsset(it) }
+        assets.forEachIndexed { index, asset ->
+            delay(index * 13000L)
+            refreshAsset(asset)
         }
     }
 
-    // Calculate Portfolio Performance
-    val portfolioTotalValue = portfolio.sumOf { asset ->
-        val currentMarketPrice = assets.find { it.symbol == asset.symbol }?.price ?: asset.averageCost
-        asset.quantity * currentMarketPrice
+    val portfolioMetrics = remember(portfolio, assets) {
+        val totalValue = portfolio.sumOf { it.quantity * (assets.find { a -> a.symbol == it.symbol }?.price ?: it.averageCost) }
+        val totalCost = portfolio.sumOf { it.quantity * it.averageCost }
+        val pnl = if (totalCost > 0) ((totalValue - totalCost) / totalCost) * 100 else 0.0
+        
+        object {
+            val totalValue = totalValue
+            val totalCost = totalCost
+            val pnl = pnl
+        }
     }
-    val portfolioTotalCost = portfolio.sumOf { it.quantity * it.averageCost }
-    val portfolioPnL = if (portfolioTotalCost > 0) ((portfolioTotalValue - portfolioTotalCost) / portfolioTotalCost) * 100 else 0.0
+    
+    val portfolioPnL = portfolioMetrics.pnl
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().background(SharkBase)) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
             Spacer(modifier = Modifier.height(56.dp))
             Text("Market Intelligence", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-            Text("Real-time terminal powered by Alpha Vantage", color = SharkMuted, fontSize = 13.sp)
+            Text("Real-time terminal powered by Alpha Vantage", color = SharkSecondary, fontSize = 13.sp)
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -139,23 +147,21 @@ fun StockForexScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        BenchmarkItem("S&P 500 (SPY)", "+1.24%", SharkGreen)
-                        BenchmarkItem("Nasdaq (QQQ)", "+0.85%", SharkGreen)
-                        BenchmarkItem("Shark Portfolio", "${if(portfolioPnL >= 0) "+" else ""}${String.format("%.2f", portfolioPnL)}%", if(portfolioPnL >= 0) SharkNavy else SharkRed)
+                        BenchmarkItem("S&P 500 (SPY)", "+1.24%", SharkGreenMid)
+                        BenchmarkItem("Nasdaq (QQQ)", "+0.85%", SharkGreenMid)
+                        BenchmarkItem("Shark Portfolio", "${if(portfolioPnL >= 0) "+" else ""}${String.format("%.2f", portfolioPnL)}%", if(portfolioPnL >= 0) SharkGold else SharkRed)
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            
+
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(assets) { asset ->
                     AssetCard(
                         asset = asset,
                         isSelected = selectedAsset?.symbol == asset.symbol,
-                        onClick = { 
-                            selectedAsset = if (selectedAsset?.symbol == asset.symbol) null else asset 
-                        },
+                        onClick = { selectedAsset = if (selectedAsset?.symbol == asset.symbol) null else asset },
                         onRefresh = { refreshAsset(asset) },
                         onAddToPortfolio = { showAddToPortfolio = asset }
                     )
@@ -186,7 +192,7 @@ fun StockForexScreen(
 @Composable
 fun BenchmarkItem(label: String, value: String, color: Color) {
     Column {
-        Text(label, color = SharkMuted, fontSize = 10.sp)
+        Text(label, color = SharkSecondary, fontSize = 10.sp)
         Text(value, color = color, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     }
 }
@@ -212,15 +218,15 @@ fun AssetCard(
                 modifier = Modifier
                     .size(44.dp)
                     .background(
-                        if (asset.change >= 0) SharkGreen.copy(alpha = 0.1f) else Color(0xFFef4444).copy(alpha = 0.1f),
+                        if (asset.change >= 0) SharkGreenMid.copy(alpha = 0.1f) else SharkRed.copy(alpha = 0.1f),
                         CircleShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    if (asset.isForex) Icons.Default.CurrencyExchange else if (asset.symbol == "BTC" || asset.symbol == "ETH") Icons.Default.CurrencyBitcoin else Icons.Default.ShowChart,
+                    if (asset.isForex) Icons.Default.CurrencyExchange else Icons.Default.ShowChart,
                     null,
-                    tint = if (asset.change >= 0) SharkGreen else Color(0xFFef4444),
+                    tint = if (asset.change >= 0) SharkGreenMid else SharkRed,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -229,12 +235,12 @@ fun AssetCard(
             
             Column(modifier = Modifier.weight(1f)) {
                 Text(asset.symbol, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(asset.name, color = SharkMuted, fontSize = 12.sp)
+                Text(asset.name, color = SharkSecondary, fontSize = 12.sp)
             }
             
             Column(horizontalAlignment = Alignment.End) {
                 if (asset.isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = SharkGreen, strokeWidth = 2.dp)
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = SharkGold, strokeWidth = 2.dp)
                 } else {
                     Text(
                         "\$${String.format(if(asset.price < 10) "%.4f" else "%,.2f", asset.price)}",
@@ -246,13 +252,13 @@ fun AssetCard(
                         Icon(
                             if(asset.change >= 0) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
                             null,
-                            tint = if(asset.change >= 0) SharkGreen else Color(0xFFef4444),
+                            tint = if(asset.change >= 0) SharkGreenMid else SharkRed,
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             "${String.format("%.2f", asset.change)}%",
-                            color = if(asset.change >= 0) SharkGreen else Color(0xFFef4444),
+                            color = if(asset.change >= 0) SharkGreenMid else SharkRed,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -263,7 +269,7 @@ fun AssetCard(
         
         if (isSelected) {
             Spacer(modifier = Modifier.height(20.dp))
-            Divider(color = Color.White.copy(alpha = 0.1f))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
             Spacer(modifier = Modifier.height(16.dp))
             
             if (asset.isForex && asset.forexDetails != null) {
@@ -285,8 +291,6 @@ fun AssetCard(
                         MarketDetailItem("Change", asset.details.change)
                     }
                 }
-            } else {
-                Text("Fundamentals loading...", color = SharkMuted, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             }
             
             Spacer(modifier = Modifier.height(20.dp))
@@ -298,7 +302,7 @@ fun AssetCard(
                     colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.05f)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(Icons.Default.Refresh, null, tint = SharkMuted, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Refresh, null, tint = SharkSecondary, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Refresh", color = Color.White, fontSize = 12.sp)
                 }
@@ -306,15 +310,23 @@ fun AssetCard(
                 Button(
                     onClick = onAddToPortfolio,
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = SharkNavy.copy(alpha = 0.1f)),
+                    colors = ButtonDefaults.buttonColors(containerColor = SharkGold.copy(alpha = 0.1f)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(Icons.Default.Add, null, tint = SharkNavy, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Add, null, tint = SharkGold, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Add to Portfolio", color = SharkNavy, fontSize = 12.sp)
+                    Text("Add to Portfolio", color = SharkGold, fontSize = 12.sp)
                 }
             }
         }
+    }
+}
+
+@Composable
+fun MarketDetailItem(label: String, value: String) {
+    Column {
+        Text(label, color = SharkSecondary, fontSize = 10.sp)
+        Text(value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -327,42 +339,33 @@ fun AddToPortfolioSheet(
     onDismiss: () -> Unit
 ) {
     var quantity by remember { mutableStateOf("") }
-    var costBasis by remember { mutableStateOf(asset.price.toString()) }
-    val scope = rememberCoroutineScope()
-    val sheetState = rememberModalBottomSheetState()
+    var avgCost by remember { mutableStateOf(asset.price.toString()) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = SharkCard,
-        contentColor = Color.White,
-        scrimColor = SharkBlack.copy(alpha = 0.8f)
+        containerColor = SharkSurface,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = SharkCardBorder) }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp)
-                .padding(bottom = 32.dp)
-        ) {
-            Text("Add ${asset.symbol} to Portfolio", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Column(modifier = Modifier.padding(24.dp).padding(bottom = 32.dp)) {
+            Text("Add to Portfolio", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(asset.name, color = SharkSecondary, fontSize = 14.sp)
+            
             Spacer(modifier = Modifier.height(24.dp))
             
             SheetInputField(
+                label = "Quantity / Shares",
                 value = quantity,
                 onValueChange = { quantity = it },
-                label = "Quantity",
-                placeholder = "0.00",
-                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                keyboardType = KeyboardType.Decimal,
+                placeholder = "0.00"
             )
             
-            Spacer(modifier = Modifier.height(20.dp))
-            
             SheetInputField(
-                value = costBasis,
-                onValueChange = { costBasis = it },
-                label = "Average Cost Basis",
-                placeholder = "0.00",
-                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                label = "Average Purchase Price ($)",
+                value = avgCost,
+                onValueChange = { avgCost = it },
+                keyboardType = KeyboardType.Decimal,
+                placeholder = asset.price.toString()
             )
             
             Spacer(modifier = Modifier.height(32.dp))
@@ -370,34 +373,27 @@ fun AddToPortfolioSheet(
             Button(
                 onClick = {
                     val q = quantity.toDoubleOrNull() ?: 0.0
-                    val c = costBasis.toDoubleOrNull() ?: 0.0
+                    val cost = avgCost.toDoubleOrNull() ?: asset.price
                     if (q > 0) {
-                        val portfolioAsset = hashMapOf(
-                            "symbol" to asset.symbol,
-                            "quantity" to q,
-                            "averageCost" to c,
-                            "assetType" to (if(asset.isForex) "FOREX" else "STOCK"),
-                            "createdAt" to Date()
+                        val portfolioAsset = PortfolioAsset(
+                            symbol = asset.symbol,
+                            quantity = q,
+                            averageCost = cost,
+                            currentPrice = asset.price,
+                            currentValue = q * asset.price
                         )
-                        db.collection("users").document(uid).collection("portfolio").add(portfolioAsset)
-                        onDismiss()
+                        db.collection("users").document(uid)
+                            .collection("portfolio").add(portfolioAsset)
+                            .addOnSuccessListener { onDismiss() }
                     }
                 },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SharkNavy),
-                shape = RoundedCornerShape(16.dp)
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = SharkGold),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Confirm Purchase", fontWeight = FontWeight.Bold)
+                Text("Confirm Purchase", color = SharkBlack, fontWeight = FontWeight.Bold)
             }
         }
-    }
-}
-
-@Composable
-fun MarketDetailItem(label: String, value: String) {
-    Column {
-        Text(label, color = SharkMuted, fontSize = 10.sp)
-        Text(value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     }
 }
 

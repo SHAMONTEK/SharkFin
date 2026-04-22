@@ -33,6 +33,8 @@ firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 firebase-auth = { module = "com.google.firebase:firebase-auth" }
 firebase-firestore = { module = "com.google.firebase:firebase-firestore" }
 firebase-storage = { module = "com.google.firebase:firebase-storage" }
+firebase-appcheck-playintegrity = { module = "com.google.firebase:firebase-appcheck-playintegrity" }
+firebase-appcheck-debug = { module = "com.google.firebase:firebase-appcheck-debug" }
 
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-ui = { group = "androidx.compose.ui", name = "ui" }

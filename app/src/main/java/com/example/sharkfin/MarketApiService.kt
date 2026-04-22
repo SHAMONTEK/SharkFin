@@ -23,7 +23,9 @@ interface AlphaVantageApi {
 }
 
 data class GlobalQuoteResponse(
-    @com.google.gson.annotations.SerializedName("Global Quote") val lastQuote: GlobalQuote? = null
+    @com.google.gson.annotations.SerializedName("Global Quote") val lastQuote: GlobalQuote? = null,
+    @com.google.gson.annotations.SerializedName("Note") val note: String? = null,
+    @com.google.gson.annotations.SerializedName("Error Message") val errorMessage: String? = null
 ) {
     data class GlobalQuote(
         @com.google.gson.annotations.SerializedName("01. symbol") val symbol: String,
@@ -39,7 +41,9 @@ data class GlobalQuoteResponse(
 }
 
 data class ForexResponse(
-    @com.google.gson.annotations.SerializedName("Realtime Currency Exchange Rate") val rate: ExchangeRate? = null
+    @com.google.gson.annotations.SerializedName("Realtime Currency Exchange Rate") val rate: ExchangeRate? = null,
+    @com.google.gson.annotations.SerializedName("Note") val note: String? = null,
+    @com.google.gson.annotations.SerializedName("Error Message") val errorMessage: String? = null
 ) {
     data class ExchangeRate(
         @com.google.gson.annotations.SerializedName("1. From_Currency Code") val fromCode: String,

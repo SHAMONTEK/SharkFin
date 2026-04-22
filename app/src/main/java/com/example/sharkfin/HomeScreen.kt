@@ -92,64 +92,86 @@ fun HomeScreen(
     val context   = LocalContext.current
     val scope     = rememberCoroutineScope()
     val haptic    = LocalHapticFeedback.current
-    val incomeCategories = SharkIncomeCategories
 
     // ── FINANCIAL DATA PREP ───────────────────────────────────────────────────
-    fun isThisMonth(date: Date): Boolean {
-        val cal1 = Calendar.getInstance()
-        val cal2 = Calendar.getInstance().apply { time = date }
-        return cal1.get(Calendar.MONTH) == cal2.get(Calendar.MONTH) &&
-                cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR)
+    val incomeCategories = SharkIncomeCategories
+    val financialMetrics = remember(expenses, incomeSources, bills, goals, debts, recurringBills, discoveryData) {
+        fun isThisMonth(date: Date): Boolean {
+            val cal1 = Calendar.getInstance()
+            val cal2 = Calendar.getInstance().apply { time = date }
+            return cal1.get(Calendar.MONTH) == cal2.get(Calendar.MONTH) &&
+                    cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR)
+        }
+
+        fun isToday(date: Date): Boolean {
+            val cal1 = Calendar.getInstance()
+            val cal2 = Calendar.getInstance().apply { time = date }
+            return cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR) &&
+                    cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR)
+        }
+
+        val wizardIncome = (discoveryData?.get("monthlyIncome") as? Double) ?: 0.0
+        val wizardObligations = (discoveryData?.get("monthlyObligations") as? Double) ?: 0.0
+        
+        val loggedMonthlyIncome = expenses.filter { isThisMonth(it.createdAtDate) && it.category in incomeCategories }.sumOf { it.amount }
+        val totalIncome = listOf(incomeSources.sumOf { it.amount }, wizardIncome, loggedMonthlyIncome).maxOrNull() ?: 0.0
+        
+        val totalSpent = expenses.filter { it.category !in incomeCategories }.sumOf { it.amount }
+        val totalIncomeAllTime = expenses.filter { it.category in incomeCategories }.sumOf { it.amount }
+        
+        val balance = if (totalIncomeAllTime > 0 || totalSpent > 0) {
+            totalIncomeAllTime - totalSpent
+        } else {
+            wizardIncome
+        }
+
+        val spentToday = expenses.filter { isToday(it.createdAtDate) && it.category !in incomeCategories }.sumOf { it.amount }
+        val dailyBudget = if (totalIncome > 0) totalIncome / 30.0 else (balance / 30.0).coerceAtLeast(0.0)
+        val totalObligations = bills.sumOf { it.amount } + debts.sumOf { it.minimumPayment } + recurringBills.sumOf { it.amount }
+        val maxObligations = totalObligations.coerceAtLeast(wizardObligations)
+
+        val spendableTodayMax = if (totalIncome > 0) {
+            ((dailyBudget - (maxObligations / 30.0)) * 0.20).coerceAtLeast(5.0)
+        } else if (balance > 0) {
+            (balance / 30.0) * 0.10
+        } else 0.0
+
+        val spendableLeft = (spendableTodayMax - spentToday).coerceAtLeast(0.0)
+        val passiveIncome = expenses.filter { it.category == "Passive Income" }.sumOf { it.amount }
+        val avgDailyBurn = if (expenses.isNotEmpty() && totalSpent > 0) totalSpent / 30.0 else (maxObligations / 30.0).coerceAtLeast(10.0)
+
+        val score = calcMoneyScore(
+            income = totalIncome, spent = totalSpent, bills = bills,
+            goals = goals, debts = debts, avgDailyBurn = avgDailyBurn,
+            balance = balance, passiveIncome = passiveIncome
+        )
+
+        object {
+            val totalIncome = totalIncome
+            val totalSpent = totalSpent
+            val balance = balance
+            val spentToday = spentToday
+            val dailyBudget = dailyBudget
+            val spendableTodayMax = spendableTodayMax
+            val spendableLeft = spendableLeft
+            val passiveIncome = passiveIncome
+            val avgDailyBurn = avgDailyBurn
+            val score = score
+        }
     }
 
-    val wizardIncome = (discoveryData?.get("monthlyIncome") as? Double) ?: 0.0
-    val wizardObligations = (discoveryData?.get("monthlyObligations") as? Double) ?: 0.0
-    
-    // Better Income Logic: Max of Planned Sources, Wizard Input, or Actual Logged Income this month
-    val loggedMonthlyIncome = expenses.filter { isThisMonth(it.createdAtDate) && it.category in incomeCategories }.sumOf { it.amount }
-    val totalIncome = listOf(incomeSources.sumOf { it.amount }, wizardIncome, loggedMonthlyIncome).maxOrNull() ?: 0.0
-    
-    val totalSpent = expenses.filter { it.category !in incomeCategories }.sumOf { it.amount }
-    val totalIncomeAllTime = expenses.filter { it.category in incomeCategories }.sumOf { it.amount }
-    
-    // If no income has ever been logged, but the user says they have a balance, 
-    // we should trust the Wizard's implied balance or at least show what's there.
-    val balance = if (totalIncomeAllTime > 0 || totalSpent > 0) {
-        totalIncomeAllTime - totalSpent
-    } else {
-        wizardIncome // Fallback to wizard income if no transactions exist yet
-    }
+    val totalIncome = financialMetrics.totalIncome
+    val totalSpent = financialMetrics.totalSpent
+    val balance = financialMetrics.balance
+    val spentToday = financialMetrics.spentToday
+    val dailyBudget = financialMetrics.dailyBudget
+    val spendableTodayMax = financialMetrics.spendableTodayMax
+    val spendableLeft = financialMetrics.spendableLeft
+    val passiveIncome = financialMetrics.passiveIncome
+    val avgDailyBurn = financialMetrics.avgDailyBurn
+    val score = financialMetrics.score
 
-    fun isToday(date: Date): Boolean {
-        val cal1 = Calendar.getInstance()
-        val cal2 = Calendar.getInstance().apply { time = date }
-        return cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR) &&
-                cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR)
-    }
-
-    val spentToday = expenses.filter { isToday(it.createdAtDate) && it.category !in incomeCategories }.sumOf { it.amount }
-    val dailyBudget = if (totalIncome > 0) totalIncome / 30.0 else (balance / 30.0).coerceAtLeast(0.0)
-    val totalObligations = bills.sumOf { it.amount } + debts.sumOf { it.minimumPayment } + recurringBills.sumOf { it.amount }
-    val maxObligations = totalObligations.coerceAtLeast(wizardObligations)
-
-    // Protection logic: If user has a large balance but no income, we allow spending based on balance runway
-    val spendableTodayMax = if (totalIncome > 0) {
-        ((dailyBudget - (maxObligations / 30.0)) * 0.20).coerceAtLeast(5.0) // Floor of $5 if they have income
-    } else if (balance > 0) {
-        (balance / 30.0) * 0.10 // 10% of daily balance if no monthly income set
-    } else 0.0
-
-    val spendableLeft = (spendableTodayMax - spentToday).coerceAtLeast(0.0)
-    val passiveIncome = expenses.filter { it.category == "Passive Income" }.sumOf { it.amount }
-    val avgDailyBurn = if (expenses.isNotEmpty() && totalSpent > 0) totalSpent / 30.0 else (maxObligations / 30.0).coerceAtLeast(10.0)
-
-    val score = calcMoneyScore(
-        income = totalIncome, spent = totalSpent, bills = bills,
-        goals = goals, debts = debts, avgDailyBurn = avgDailyBurn,
-        balance = balance, passiveIncome = passiveIncome
-    )
-
-    val firstName = displayName.split(" ").firstOrNull()?.ifBlank { "Shark" } ?: "Shark"
+    val firstName = remember(displayName) { displayName.split(" ").firstOrNull()?.ifBlank { "Shark" } ?: "Shark" }
 
     // ── AI AGENT STATE ───────────────────────────────────────────────────────
     val sharkAssistant = remember {
@@ -299,44 +321,51 @@ fun HomeScreen(
     }
 
     // ── SHARK MOOD & LOTTIE ──────────────────────────────────────────────────
-    val runwayDays = if (avgDailyBurn > 0) (balance / avgDailyBurn).toInt().coerceAtLeast(0) else 999
-    val sharkMood = when {
-        isThinking      -> SharkMood.CURIOUS
-        runwayDays < 7  -> SharkMood.HUNGRY
-        score >= 70     -> SharkMood.HAPPY
-        spendableLeft <= 0 -> SharkMood.CONCERNED
-        else            -> SharkMood.NEUTRAL
+    val runwayDays = remember(avgDailyBurn, balance) { if (avgDailyBurn > 0) (balance / avgDailyBurn).toInt().coerceAtLeast(0) else 999 }
+    val sharkMood = remember(isThinking, runwayDays, score, spendableLeft) {
+        when {
+            isThinking      -> SharkMood.CURIOUS
+            runwayDays < 7  -> SharkMood.HUNGRY
+            score >= 70     -> SharkMood.HAPPY
+            spendableLeft <= 0 -> SharkMood.CONCERNED
+            else            -> SharkMood.NEUTRAL
+        }
     }
 
     var showProfileSettings by remember { mutableStateOf(false) }
     var tempDisplayName by remember { mutableStateOf(displayName) }
 
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.cute_shark_animation))
-    val moodClip = when (sharkMood) {
-        SharkMood.HAPPY   -> LottieClipSpec.Frame(72, 96)
-        SharkMood.SAD, SharkMood.HUNGRY -> LottieClipSpec.Frame(24, 72)
-        SharkMood.NEUTRAL -> LottieClipSpec.Frame(96, 137)
-        SharkMood.CURIOUS -> LottieClipSpec.Frame(137, 160)
-        else              -> LottieClipSpec.Frame(96, 137)
+    val moodClip = remember(sharkMood) {
+        when (sharkMood) {
+            SharkMood.HAPPY   -> LottieClipSpec.Frame(72, 96)
+            SharkMood.SAD, SharkMood.HUNGRY -> LottieClipSpec.Frame(24, 72)
+            SharkMood.NEUTRAL -> LottieClipSpec.Frame(96, 137)
+            SharkMood.CURIOUS -> LottieClipSpec.Frame(137, 160)
+            else              -> LottieClipSpec.Frame(96, 137)
+        }
     }
     val lottieProgress by animateLottieCompositionAsState(composition = composition, iterations = LottieConstants.IterateForever, clipSpec = moodClip)
 
     // ── TOOLKIT TILES ────────────────────────────────────────────────────────
-    val nextBill = bills.filter { !it.isPaid }.minByOrNull { it.dayOfMonth }
-    val topGoal = goals.filter { !it.isCompleted }.maxByOrNull { if(it.targetAmount > 0) it.savedAmount/it.targetAmount else 0.0 }
-    val savingsRate = if(totalIncome > 0) ((totalIncome - totalSpent) / totalIncome * 100).toInt() else 0
+    val toolkitTiles = remember(bills, goals, totalIncome, totalSpent, spentToday, spendableTodayMax, passiveIncome, runwayDays, firstName, accountType) {
+        val nextBill = bills.filter { !it.isPaid }.minByOrNull { it.dayOfMonth }
+        val topGoal = goals.filter { !it.isCompleted }.maxByOrNull { if(it.targetAmount > 0) it.savedAmount/it.targetAmount else 0.0 }
+        val savingsRate = if(totalIncome > 0) ((totalIncome - totalSpent) / totalIncome * 100).toInt() else 0
 
-    val toolkitTiles = listOf(
-        EnvironmentTile("Expense Tracker", "Expense Tracker", Icons.Default.AccountBalanceWallet, SharkGold, SharkGoldGlow, true, liveLabel = "TODAY'S SPEND", liveValue = "$${String.format(Locale.US, "%.2f", spentToday)}", liveSubValue = if(spentToday > spendableTodayMax) "Over limit" else "On track", trendPoints = listOf(0.4f, 0.7f, 0.3f, 0.9f, 0.6f, 0.8f)),
-        EnvironmentTile("Import Statement", "Import Statement", Icons.Default.FileUpload, SharkGold, SharkGoldGlow, true, tag = "NEW", tagBg = SharkGoldGlow, tagText = SharkGold, liveLabel = "LAST IMPORT", liveValue = "None yet", trendPoints = listOf(0.1f, 0.1f, 0.5f, 0.1f, 0.9f)),
-        EnvironmentTile("Bill Tracker", "Bill Tracker", Icons.Default.Receipt, SharkAmber, Color(0x1AEE944B), true, liveLabel = "NEXT DUE", liveValue = nextBill?.let { "$${it.amount.toInt()}" } ?: "All clear", liveSubValue = nextBill?.let { "${it.name} · ${ordinal(it.dayOfMonth)}" } ?: "No bills", trendPoints = listOf(0.2f, 0.8f, 0.1f, 0.9f, 0.3f)),
-        EnvironmentTile("Goal Tracker", "Goal Tracker", Icons.Default.Flag, SharkTeal, Color(0x1A4BA3E8), true, liveLabel = "TOP GOAL", liveValue = topGoal?.let { "${(it.savedAmount/it.targetAmount*100).toInt()}%" } ?: "Set goal", liveSubValue = topGoal?.name ?: "No active goals", trendPoints = listOf(0.1f, 0.2f, 0.4f, 0.7f, 0.85f)),
-        EnvironmentTile("Visual Models", "Visual Models", Icons.Default.BarChart, SharkPurple, Color(0x1AAF52DE), true, liveLabel = "SAVINGS RATE", liveValue = "$savingsRate%", liveSubValue = "vs 20% target", trendPoints = listOf(0.5f, 0.6f, 0.4f, 0.8f, 0.9f)),
-        EnvironmentTile("Tax Tracker", "Tax Tracker", Icons.Default.Description, SharkRed, Color(0x1AE05C5C), true, tag = "BETA", tagBg = Color(0x1AE05C5C), tagText = SharkRed, liveLabel = "EST. OWED", liveValue = "$${(totalIncome * 0.22).toInt()}", trendPoints = listOf(0.8f, 0.8f, 0.8f, 0.8f, 0.8f)),
-        EnvironmentTile("Dividend Tracker", "Dividend Tracker", Icons.Default.Payments, SharkGold, SharkGoldGlow, true, tag = "NEW", tagBg = SharkGoldGlow, tagText = SharkGold, liveLabel = "PASSIVE / MO", liveValue = "$${String.format(Locale.US, "%.2f", passiveIncome)}", trendPoints = listOf(0.1f, 0.25f, 0.4f, 0.6f, 0.8f)),
-        EnvironmentTile("Freedom Runway", "Freedom Runway", Icons.Default.FlightTakeoff, SharkGold, SharkGoldGlow, true, liveLabel = "RUNWAY", liveValue = if(runwayDays < 999) "$runwayDays days" else "Infinite", trendPoints = listOf(0.2f, 0.3f, 0.5f, 0.6f, 0.7f)),
-        EnvironmentTile("Settings", "Settings", Icons.Default.Settings, SharkSecondary, SharkSurface, true, liveLabel = "PROFILE", liveValue = firstName, liveSubValue = accountType)
-    )
+        listOf(
+            EnvironmentTile("Expense Tracker", "Expense Tracker", Icons.Default.AccountBalanceWallet, SharkGold, SharkGoldGlow, true, liveLabel = "TODAY'S SPEND", liveValue = "$${String.format(Locale.US, "%.2f", spentToday)}", liveSubValue = if(spentToday > spendableTodayMax) "Over limit" else "On track", trendPoints = listOf(0.4f, 0.7f, 0.3f, 0.9f, 0.6f, 0.8f)),
+            EnvironmentTile("Import Statement", "Import Statement", Icons.Default.FileUpload, SharkGold, SharkGoldGlow, true, tag = "NEW", tagBg = SharkGoldGlow, tagText = SharkGold, liveLabel = "LAST IMPORT", liveValue = "None yet", trendPoints = listOf(0.1f, 0.1f, 0.5f, 0.1f, 0.9f)),
+            EnvironmentTile("Bill Tracker", "Bill Tracker", Icons.Default.Receipt, SharkAmber, Color(0x1AEE944B), true, liveLabel = "NEXT DUE", liveValue = nextBill?.let { "$${it.amount.toInt()}" } ?: "All clear", liveSubValue = nextBill?.let { "${it.name} · ${ordinal(it.dayOfMonth)}" } ?: "No bills", trendPoints = listOf(0.2f, 0.8f, 0.1f, 0.9f, 0.3f)),
+            EnvironmentTile("Goal Tracker", "Goal Tracker", Icons.Default.Flag, SharkTeal, Color(0x1A4BA3E8), true, liveLabel = "TOP GOAL", liveValue = topGoal?.let { "${(it.savedAmount/it.targetAmount*100).toInt()}%" } ?: "Set goal", liveSubValue = topGoal?.name ?: "No active goals", trendPoints = listOf(0.1f, 0.2f, 0.4f, 0.7f, 0.85f)),
+            EnvironmentTile("Visual Models", "Visual Models", Icons.Default.BarChart, SharkPurple, Color(0x1AAF52DE), true, liveLabel = "SAVINGS RATE", liveValue = "$savingsRate%", liveSubValue = "vs 20% target", trendPoints = listOf(0.5f, 0.6f, 0.4f, 0.8f, 0.9f)),
+            EnvironmentTile("Tax Tracker", "Tax Tracker", Icons.Default.Description, SharkRed, Color(0x1AE05C5C), true, tag = "BETA", tagBg = Color(0x1AE05C5C), tagText = SharkRed, liveLabel = "EST. OWED", liveValue = "$${(totalIncome * 0.22).toInt()}", trendPoints = listOf(0.8f, 0.8f, 0.8f, 0.8f, 0.8f)),
+            EnvironmentTile("Dividend Tracker", "Dividend Tracker", Icons.Default.Payments, SharkGold, SharkGoldGlow, true, tag = "NEW", tagBg = SharkGoldGlow, tagText = SharkGold, liveLabel = "PASSIVE / MO", liveValue = "$${String.format(Locale.US, "%.2f", passiveIncome)}", trendPoints = listOf(0.1f, 0.25f, 0.4f, 0.6f, 0.8f)),
+            EnvironmentTile("Market Terminal", "Market Terminal", Icons.Default.Analytics, SharkGreen, Color(0x1A10B981), true, tag = "LIVE", tagBg = Color(0x1A10B981), tagText = SharkGreen, liveLabel = "S&P 500", liveValue = "+1.24%", trendPoints = listOf(0.4f, 0.5f, 0.45f, 0.7f, 0.8f)),
+            EnvironmentTile("Freedom Runway", "Freedom Runway", Icons.Default.FlightTakeoff, SharkGold, SharkGoldGlow, true, liveLabel = "RUNWAY", liveValue = if(runwayDays < 999) "$runwayDays days" else "Infinite", trendPoints = listOf(0.2f, 0.3f, 0.5f, 0.6f, 0.7f)),
+            EnvironmentTile("Settings", "Settings", Icons.Default.Settings, SharkSecondary, SharkSurface, true, liveLabel = "PROFILE", liveValue = firstName, liveSubValue = accountType)
+        )
+    }
 
     fun onTileClick(id: String) {
         if (id == "Settings") {
@@ -450,14 +479,16 @@ fun HomeScreen(
             }
         }
 
-    val suggestedPrompts = listOf(
-        "Summarize my recent imports",
-        "When is my next bill due?",
-        "Can I afford to spend $50?",
-        "How do I improve my score?",
-        "How much spent on food today?",
-        "Analyze my spending trajectory"
-    )
+    val suggestedPrompts = remember {
+        listOf(
+            "Summarize my recent imports",
+            "When is my next bill due?",
+            "Can I afford to spend $50?",
+            "How do I improve my score?",
+            "How much spent on food today?",
+            "Analyze my spending trajectory"
+        )
+    }
 
     // ── CHAT OVERLAY ─────────────────────────────────────────────────────
     AnimatedVisibility(

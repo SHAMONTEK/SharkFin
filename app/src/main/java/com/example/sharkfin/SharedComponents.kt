@@ -24,6 +24,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.firestore.IgnoreExtraProperties
+import com.google.firebase.firestore.PropertyName
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.*
@@ -105,15 +107,58 @@ enum class SharkAgentSession { IDLE, AWAITING_SETUP_BALANCE, AWAITING_SAVINGS_TA
 
 data class SharkChatMessage(val text: String, val isShark: Boolean, val timestamp: Long = System.currentTimeMillis())
 
-data class Expense(val id: String = "", val title: String = "", val amount: Double = 0.0, val category: String = "Other", val note: String = "", val createdAt: Any? = null) {
-    val createdAtDate: Date get() = when (val c = createdAt) { is Timestamp -> c.toDate(); is Date -> c; else -> Date() }
+@IgnoreExtraProperties
+data class Expense(
+    val id: String = "",
+    val title: String = "",
+    val amount: Double = 0.0,
+    val category: String = "Other",
+    val note: String = "",
+    val createdAt: Any? = null,
+    @get:PropertyName("createdAtDate") @set:PropertyName("createdAtDate") var createdAtDateValue: Date? = null
+) {
+    val createdAtDate: Date 
+        get() = createdAtDateValue ?: when (val c = createdAt) { 
+            is Timestamp -> c.toDate() 
+            is Date -> c 
+            else -> Date() 
+        }
 }
 
-data class Bill(val id: String = "", val name: String = "", val amount: Double = 0.0, val dayOfMonth: Int = 1, val recurrence: String = "Monthly", val isPaid: Boolean = false, val category: String = "Bills & Utilities")
+@IgnoreExtraProperties
+data class Bill(
+    val id: String = "",
+    val name: String = "",
+    val amount: Double = 0.0,
+    val dayOfMonth: Int = 1,
+    val recurrence: String = "Monthly",
+    var isPaid: Boolean = false,
+    val category: String = "Bills & Utilities",
+    val color: String = "#E8944B"
+)
 
-data class Goal(val id: String = "", val name: String = "", val targetAmount: Double = 0.0, val savedAmount: Double = 0.0, val category: String = "Savings", val deadline: String = "", val isCompleted: Boolean = false, val colorHex: String = "#3B6D11")
+@IgnoreExtraProperties
+data class Goal(
+    val id: String = "",
+    val name: String = "",
+    val targetAmount: Double = 0.0,
+    val savedAmount: Double = 0.0,
+    val category: String = "Savings",
+    val deadline: String = "",
+    var isCompleted: Boolean = false,
+    val colorHex: String = "#3B6D11"
+)
 
-data class Debt(val id: String = "", val name: String = "", val totalAmount: Double = 0.0, val currentBalance: Double = 0.0, val minimumPayment: Double = 0.0, val interestRate: Double = 0.0, val apr: Double = 0.0)
+@IgnoreExtraProperties
+data class Debt(
+    val id: String = "",
+    val name: String = "",
+    val totalAmount: Double = 0.0,
+    val currentBalance: Double = 0.0,
+    val minimumPayment: Double = 0.0,
+    val interestRate: Double = 0.0,
+    val apr: Double = 0.0
+)
 
 data class IncomeSource(val id: String = "", val name: String = "", val amount: Double = 0.0, val frequency: String = "Monthly")
 
